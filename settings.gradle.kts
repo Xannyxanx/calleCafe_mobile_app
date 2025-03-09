@@ -16,9 +16,12 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+
     }
 }
 
 rootProject.name = "LoginPage"
 include(":app")
+include (":opencv")
+project(":opencv").projectDir = File(rootDir, "app/src/main/opencv")
  
