@@ -222,8 +222,8 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                             .bounceClick()
                             .height(48.dp),
                         onClick = {
-                            navController.navigate("Routes.ManualScreen") {
-                                popUpTo("Routes.ManualScreen") { inclusive = true }
+                            navController.navigate("Routes.ScannerScreen") {
+                                popUpTo("Routes.ScannerScreen") { inclusive = true }
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDAA520))

@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import java.util.Scanner
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -284,25 +285,31 @@ private fun startCamera(
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 private fun processImageForTextRecognition(
     imageProxy: ImageProxy,
-    context: android.content.Context,
+    context: Context,
     isScanning: MutableState<Boolean>,
     navController: NavController
 ) {
     val mediaImage = imageProxy.image
     if (mediaImage != null) {
-        val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        // Rotate the image to simulate horizontal scanning
+        val rotationDegrees = 90 // Force 90-degree rotation (landscape)
+        val inputImage = InputImage.fromMediaImage(mediaImage, rotationDegrees)
+
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        recognizer.process(inputImage).addOnSuccessListener { visionText ->
-            processText(visionText, context, navController)
-        }.addOnFailureListener { e ->
-            Log.e("TextRecognition", "Failed to process image", e)
-        }.addOnCompleteListener {
-            imageProxy.close()
-            isScanning.value = false // Reset scanning state after processing
-        }
+        recognizer.process(inputImage)
+            .addOnSuccessListener { visionText ->
+                processText(visionText, context, navController)
+            }
+            .addOnFailureListener { e ->
+                Log.e("OCR", "Recognition failed", e)
+            }
+            .addOnCompleteListener {
+                imageProxy.close()
+                isScanning.value = false
+            }
     } else {
         imageProxy.close()
-        isScanning.value = false // Reset scanning state if no media image
+        isScanning.value = false
     }
 }
 
