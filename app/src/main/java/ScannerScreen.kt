@@ -54,9 +54,10 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import java.util.Scanner
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
+import android.os.Bundle
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -81,23 +82,33 @@ import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.loginpage.AccountHolder
+import com.example.loginpage.AccountViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ScannerScreen(navController: NavController) {
+fun ScannerScreen(navController: NavController, accountViewModel: AccountViewModel = viewModel()) {
+    val accountHolder = accountViewModel.accountHolder.collectAsState().value
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     val previewView = remember { PreviewView(context) }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     val isScanning = remember { mutableStateOf(false) }
+    val selectedItems = remember { mutableStateListOf<String>() }
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { granted ->
             if (granted) {
-                startCamera(cameraProviderFuture, lifecycleOwner, previewView, context, cameraExecutor, isScanning, navController)
+                startCamera(cameraProviderFuture, lifecycleOwner, previewView, context, cameraExecutor, isScanning, navController, selectedItems)
             } else {
                 // Handle permission denial
             }
@@ -106,7 +117,7 @@ fun ScannerScreen(navController: NavController) {
 
     LaunchedEffect(Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            startCamera(cameraProviderFuture, lifecycleOwner, previewView, context, cameraExecutor, isScanning, navController)
+            startCamera(cameraProviderFuture, lifecycleOwner, previewView, context, cameraExecutor, isScanning, navController, selectedItems)
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
@@ -125,7 +136,8 @@ fun ScannerScreen(navController: NavController) {
         topBar = {
             AppTopBar(
                 navController = navController,
-                cashierName = cashierName
+                cashierName = accountHolder?.name,
+                cashierBranch = accountHolder?.branch
             )
         }
     ) { paddingValues ->
@@ -138,14 +150,14 @@ fun ScannerScreen(navController: NavController) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Cashier: ${cashierName ?: "No User"}",
+                text = "Cashier: ${accountHolder?.name ?: "No User"}",
                 color = Color.White.copy(alpha = 0.5f),
                 modifier = Modifier
                     .align(Alignment.Start)
                     .padding(bottom = 8.dp)
             )
             Text(
-                text = "Branch: Dapitan",
+                text = "Cashier: ${accountHolder?.branch ?: "No User"}",
                 color = Color.White.copy(alpha = 0.5f),
                 modifier = Modifier
                     .align(Alignment.Start)
@@ -178,7 +190,13 @@ fun ScannerScreen(navController: NavController) {
 
             // Scan Button
             Button(
-                onClick = { isScanning.value = true },
+                onClick = {
+                    if (selectedItems.isNotEmpty()) {
+                        isScanning.value = true
+                    } else {
+                        Log.d("ScannerScreen", "No selected items. Cannot start scanning.")
+                    }
+                },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF008000),
                     contentColor = Color(0xFFFFFFFF)
@@ -195,6 +213,13 @@ fun ScannerScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(50.dp))
 
             // Food Selection
+            val itemsList = listOf(
+                Pair("Drinks", R.drawable.drinks),
+                Pair("Pasta", R.drawable.pasta),
+                Pair("Pastry", R.drawable.snacks)
+            )
+            val selectedStates = remember { itemsList.map { mutableStateOf(false) } }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -209,14 +234,9 @@ fun ScannerScreen(navController: NavController) {
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    items(
-                        listOf(
-                            Pair("Water", R.drawable.drinks),
-                            Pair("Pasta", R.drawable.pasta),
-                            Pair("Snacks", R.drawable.snacks)
-                        )
-                    ) { (description, drawableId) ->
-                        val isSelected = remember { mutableStateOf(false) }
+                    items(itemsList.size) { index ->
+                        val (description, drawableId) = itemsList[index]
+                        val isSelected = selectedStates[index]
                         val alphaValue by animateFloatAsState(if (isSelected.value) 0.5f else 1f)
 
                         Box(
@@ -224,7 +244,14 @@ fun ScannerScreen(navController: NavController) {
                                 .width(100.dp)
                                 .height(100.dp)
                                 .padding(horizontal = 8.dp)
-                                .clickable { isSelected.value = !isSelected.value }
+                                .clickable {
+                                    isSelected.value = !isSelected.value
+                                    if (isSelected.value) {
+                                        selectedItems.add(description)
+                                    } else {
+                                        selectedItems.remove(description)
+                                    }
+                                }
                                 .border(
                                     width = if (isSelected.value) 2.dp else 0.dp,
                                     color = if (isSelected.value) Color(0xFF008000) else Color.Transparent,
@@ -254,7 +281,8 @@ private fun startCamera(
     context: android.content.Context,
     cameraExecutor: ExecutorService,
     isScanning: MutableState<Boolean>,
-    navController: NavController
+    navController: NavController,
+    selectedItems: List<String>
 ) {
     cameraProviderFuture.addListener({
         val cameraProvider = cameraProviderFuture.get()
@@ -266,7 +294,7 @@ private fun startCamera(
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
         imageAnalysis.setAnalyzer(cameraExecutor, { imageProxy ->
             if (isScanning.value) {
-                processImageForTextRecognition(imageProxy, context, isScanning, navController)
+                processImageForTextRecognition(imageProxy, context, isScanning, navController, selectedItems)
             } else {
                 imageProxy.close()
             }
@@ -285,36 +313,51 @@ private fun startCamera(
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 private fun processImageForTextRecognition(
     imageProxy: ImageProxy,
-    context: Context,
+    context: android.content.Context,
     isScanning: MutableState<Boolean>,
-    navController: NavController
+    navController: NavController,
+    selectedItems: List<String>
 ) {
+    if (selectedItems.isEmpty()) {
+        Log.d("ScannerScreen", "No selected items. Skipping text recognition.")
+        isScanning.value = false
+        imageProxy.close()
+        return
+    }
+
     val mediaImage = imageProxy.image
     if (mediaImage != null) {
-        // Rotate the image to simulate horizontal scanning
-        val rotationDegrees = 90 // Force 90-degree rotation (landscape)
-        val inputImage = InputImage.fromMediaImage(mediaImage, rotationDegrees)
-
+        val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        recognizer.process(inputImage)
-            .addOnSuccessListener { visionText ->
-                processText(visionText, context, navController)
-            }
-            .addOnFailureListener { e ->
-                Log.e("OCR", "Recognition failed", e)
-            }
-            .addOnCompleteListener {
+        recognizer.process(inputImage).addOnSuccessListener { visionText ->
+            if (!detected(visionText)) {
+                Log.d("ScannerScreen", "No ID detected. Navigating to ManualScreen.")
+                Toast.makeText(context, "No valid ID detected. Proceeding to Manual Input", Toast.LENGTH_SHORT).show()
                 imageProxy.close()
                 isScanning.value = false
+
+                // Use CoroutineScope to navigate on the main thread
+                CoroutineScope(Dispatchers.Main).launch {
+                    // Join and encode items as URL-safe string
+                    val encodedItems = URLEncoder.encode(selectedItems.joinToString(","), "UTF-8")
+                    navController.navigate("Routes.ManualScreen?selectedItems=$encodedItems")
+                }
+                return@addOnSuccessListener
             }
+            processText(visionText, context, navController, selectedItems)
+        }.addOnFailureListener { e ->
+            Log.e("TextRecognition", "Failed to process image", e)
+        }.addOnCompleteListener {
+            imageProxy.close()
+            isScanning.value = false // Reset scanning state after processing
+        }
     } else {
         imageProxy.close()
-        isScanning.value = false
+        isScanning.value = false // Reset scanning state if no media image
     }
 }
 
-
-private fun processText(visionText: Text, context: android.content.Context, navController: NavController) {
+private fun processText(visionText: Text, context: android.content.Context, navController: NavController, selectedItems: List<String>) {
     if (!detected(visionText)) {
         Log.d("ProcessText", "Not a PWD or Senior Citizen ID. Skipping extraction.")
         return
@@ -324,13 +367,16 @@ private fun processText(visionText: Text, context: android.content.Context, navC
     val name = extractName(fullText)
     val idNumber = extractIdNumber(fullText)
     val city = extractCity(fullText)
+    val items = selectedItems.joinToString(",")
 
     Log.d("ProcessText", "Extracted Name: $name")
     Log.d("ProcessText", "Extracted ID Number: $idNumber")
     Log.d("ProcessText", "Extracted City: $city")
+    Log.d("ProcessText", "Selected Items: $items")
 
-    // Navigate to ConfirmationScreen with the extracted data
-    navController.navigate("confirmation_screen/$name/$idNumber/$city")
+    // Navigate to ConfirmationScreen with the extracted data and selected items
+    val encodedItems = URLEncoder.encode(items, "UTF-8")
+    navController.navigate("confirmation_screen/$name/$idNumber/$city/$encodedItems")
 }
 
 private fun detected(visionText: Text): Boolean {

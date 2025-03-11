@@ -45,16 +45,24 @@ import com.android.volley.Response
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import org.json.JSONObject
+import java.net.URLDecoder
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun ConfirmationScreen(navController: NavController, name: String, idNumber: String, city: String) {
+fun ConfirmationScreen(navController: NavController, name: String, idNumber: String, city: String, items: String, accountViewModel: AccountViewModel = viewModel()) {
     val context = LocalContext.current
     val transactionSuccessful by remember { mutableStateOf(true) }
     var showConfirmDialog by remember { mutableStateOf(false) } // State for the confirmation dialog
     val nameDb = name
     val idNumberDb = idNumber
     val cityDb = city
+    val decodedItems = URLDecoder.decode(items, "UTF-8")
+    val accountHolder = accountViewModel.accountHolder.collectAsState().value
+    val decodedName = URLDecoder.decode(name, "UTF-8")
+    val decodedIdNumber = URLDecoder.decode(idNumber, "UTF-8")
+    val decodedCity = URLDecoder.decode(city, "UTF-8")
 
     //Wag galawin
     fun insertData(idNumber: String, name: String, disability: String) {
@@ -197,9 +205,10 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                Text(text = "Name: $name", style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "ID Number: $idNumber", style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "City: $city", style = MaterialTheme.typography.bodyLarge)
+                                Text(text = "Name: $decodedName", style = MaterialTheme.typography.bodyLarge)
+                                Text(text = "ID Number: $decodedIdNumber", style = MaterialTheme.typography.bodyLarge)
+                                Text(text = "City: $decodedCity", style = MaterialTheme.typography.bodyLarge)
+                                Text(text = "Food: $decodedItems", style = MaterialTheme.typography.bodyLarge)
                             }
                         }
 
@@ -259,11 +268,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                 Button(onClick = {
                     navController.navigate("Routes.ScannerScreen")
 
-
-
                     //******** IMPORTANT, Code to input data from mobile app papunta sa database ********
-
-
 
                     Log.d("DEBUG", "IdNumber: $idNumberDb, Name: $nameDb, Disability: $cityDb")
 
@@ -274,7 +279,6 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                         Toast.makeText(context, "Please fill in all the fields", Toast.LENGTH_SHORT).show()
                     }
 
-
                     if (transactionSuccessful) {
 
                     } else {
@@ -282,12 +286,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                     }
                     showConfirmDialog = false
 
-
-
-                })
-
-                 {
-
+                }) {
                     Text("Yes")
                 }
             },

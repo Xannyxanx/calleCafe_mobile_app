@@ -1,6 +1,7 @@
 package com.example.loginpage
 
 import android.annotation.SuppressLint
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
@@ -61,24 +62,29 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
+import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun ManualScreen(navController: NavController) {
+fun ManualScreen(navController: NavController, accountViewModel: AccountViewModel = viewModel(),  selectedItemsFromScanner: List<String> = emptyList()) {
+    val accountHolder = accountViewModel.accountHolder.collectAsState().value
     val focusManager = LocalFocusManager.current
     val idNumberInputManual = remember { mutableStateOf("") }
     val nameInputManual = remember { mutableStateOf("") }
     val cityInputManual = remember { mutableStateOf("") }
-    val disabilityOptions = listOf("Orthopedic", "Chronic", "Visual","Communication","Learning","Mental","Psychosocial")
+    val disabilityOptions = listOf("Orthopedic", "Chronic", "Visual", "Communication", "Learning", "Mental", "Psychosocial")
     val selectedDisability = remember { mutableStateOf(disabilityOptions[0]) }
     val expanded = remember { mutableStateOf(false) }
-    val selectedItems = remember { mutableStateListOf<String>() }
     val isPWDSelected = remember { mutableStateOf(false) }
     val isSeniorCitizenSelected = remember { mutableStateOf(false) }
     val isOthersSelected = remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val selectedItems = remember { mutableStateListOf<String>().apply {
+        addAll(selectedItemsFromScanner)
+    } }
 
     BackHandler {
         navController.navigate("Routes.ScannerScreen") {
@@ -106,7 +112,6 @@ fun ManualScreen(navController: NavController) {
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-
                 // Main content card
                 Card(
                     modifier = Modifier
@@ -144,9 +149,9 @@ fun ManualScreen(navController: NavController) {
                         ) {
                             items(
                                 listOf(
-                                    Pair("Water", R.drawable.drinks),
+                                    Pair("Drinks", R.drawable.drinks),
                                     Pair("Pasta", R.drawable.pasta),
-                                    Pair("Snacks", R.drawable.snacks)
+                                    Pair("Pastry", R.drawable.snacks)
                                 )
                             ) { (description, drawableId) ->
                                 val isSelected = selectedItems.contains(description)
@@ -156,7 +161,7 @@ fun ManualScreen(navController: NavController) {
                                         .padding(horizontal = 8.dp)
                                         .border(
                                             width = if (isSelected) 2.dp else 0.dp,
-                                            color = if (isSelected) Color(0xFF008000)else Color.Transparent,
+                                            color = if (isSelected) Color(0xFF008000) else Color.Transparent,
                                             shape = RoundedCornerShape(4.dp)
                                         )
                                         .clickable {
@@ -187,17 +192,10 @@ fun ManualScreen(navController: NavController) {
                         // Text fields
                         OutlinedTextField(
                             value = idNumberInputManual.value,
-                            onValueChange = {
-                                if (it.length <= 4 && it.all { char -> char.isDigit() }) {
-                                    idNumberInputManual.value = it
-                                }
-                            },
+                            onValueChange = { idNumberInputManual.value = it },
                             label = { Text("Input ID Number") },
                             modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number,
-                                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
-                                autoCorrect = false
-                            ),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = androidx.compose.ui.text.input.ImeAction.Done, autoCorrect = false),
                             colors = outlinedTextFieldColors(
                                 focusedBorderColor = Color.Black,
                                 unfocusedBorderColor = Color.Black,
@@ -211,16 +209,13 @@ fun ManualScreen(navController: NavController) {
                         OutlinedTextField(
                             value = nameInputManual.value,
                             onValueChange = {
-                                if (it.matches(Regex("^[A-Za-z.,-]*$"))) {
+                                if (it.matches(Regex("^[A-Za-z .\\-]*$"))) { // Allow only letters and spaces
                                     nameInputManual.value = it
                                 }
                             },
                             label = { Text("Input Fullname") },
                             modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
-                                autoCorrect = false
-                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done, autoCorrect = false),
                             colors = outlinedTextFieldColors(
                                 focusedBorderColor = Color.Black,
                                 unfocusedBorderColor = Color.Black,
@@ -228,21 +223,19 @@ fun ManualScreen(navController: NavController) {
                                 unfocusedLabelColor = Color.Black
                             )
                         )
+
                         Spacer(modifier = Modifier.height(5.dp))
 
                         OutlinedTextField(
                             value = cityInputManual.value,
                             onValueChange = {
-                                if (it.matches(Regex("^[A-Za-z.,-]*$"))) {
+                                if (it.matches(Regex("^[A-Za-z ]*$"))) {
                                     cityInputManual.value = it
                                 }
                             },
                             label = { Text("Input City") },
                             modifier = Modifier.fillMaxWidth(),
-                            keyboardOptions = KeyboardOptions(
-                                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
-                                autoCorrect = false
-                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done, autoCorrect = false),
                             colors = TextFieldDefaults.outlinedTextFieldColors(
                                 focusedBorderColor = Color.Black,
                                 unfocusedBorderColor = Color.Black,
@@ -250,6 +243,7 @@ fun ManualScreen(navController: NavController) {
                                 unfocusedLabelColor = Color.Black
                             )
                         )
+
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // Discount Buttons
@@ -345,13 +339,22 @@ fun ManualScreen(navController: NavController) {
                 // Submit Button
                 Button(
                     onClick = {
-                        handleSubmissionManual(
-                            context = context,
-                            navController = navController,
-                            nameInput = nameInputManual.value,
-                            pinInput = idNumberInputManual.value,
-                            pwd = selectedDisability.value
-                        )
+                        // Validate input fields
+                        if (idNumberInputManual.value.isBlank() ||
+                            nameInputManual.value.isBlank() ||
+                            cityInputManual.value.isBlank() ||
+                            selectedItems.isEmpty()) {
+                            Toast.makeText(context, "Please fill all fields and select items", Toast.LENGTH_SHORT).show()
+                        } else {
+                            // URL encode values
+                            val name = URLEncoder.encode(nameInputManual.value, "UTF-8")
+                            val idNumber = URLEncoder.encode(idNumberInputManual.value, "UTF-8")
+                            val city = URLEncoder.encode(cityInputManual.value, "UTF-8")
+                            val items = URLEncoder.encode(selectedItems.joinToString(","), "UTF-8")
+
+                            // Navigate to ConfirmationScreen with encoded values
+                            navController.navigate("Routes.ConfirmationScreen/$name/$idNumber/$city/$items")
+                        }
                     },
                     modifier = Modifier
                         .height(64.dp)

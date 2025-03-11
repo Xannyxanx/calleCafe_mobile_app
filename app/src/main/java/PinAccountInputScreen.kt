@@ -23,6 +23,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,12 +39,14 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.android.volley.Request
 import com.android.volley.RequestQueue
 import com.android.volley.Response
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
+import com.example.loginpage.AccountViewModel
 import com.example.loginpage.EmptyTopAppBar
 import com.example.loginpage.OtpTextField
 import com.example.loginpage.PinTopAppBar
@@ -52,46 +56,60 @@ import org.json.JSONObject
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun PinAccountInputScreen(navController: NavController) {
+fun PinAccountInputScreen(navController: NavController, accountViewModel: AccountViewModel = viewModel()) {
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
-    val correctPin = "1234"
-
+    val accountHolder = accountViewModel.accountHolder.collectAsState().value
     var otpText by remember { mutableStateOf("") }
+    var loginSuccess by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    fun selectData(pin: String) {
-        val url = "http://192.168.254.107/login.php"
+    LaunchedEffect(loginSuccess) {
+        if (loginSuccess) {
+            navController.navigate("Routes.AccountsScreen") {
+                popUpTo("Routes.PinAccountInputScreen") { inclusive = true }
+            }
+        }
+    }
+
+    fun verifyPin(pin: String) {
+        val url = "http://192.168.254.107/CalleCafe/mobile/verify_pin.php"
         val requestQueue: RequestQueue = Volley.newRequestQueue(context)
 
-        // Connection to database
         val stringRequest = object : StringRequest(
             Request.Method.POST, url,
             Response.Listener { response ->
                 try {
-                    Log.d("Response", response) // Log the raw response
                     val jsonResponse = JSONObject(response)
                     if (jsonResponse.getBoolean("success")) {
-                        val cashierName = jsonResponse.getJSONObject("user").getString("name")
-                        Toast.makeText(context, "Login Success!", Toast.LENGTH_SHORT).show()
-                        Log.d("Navigation", "Navigating to: Routes.ScannerScreen?cashierName=$cashierName")
-                        navController.navigate("Routes.ScannerScreen?cashierName=$cashierName") {
-                            popUpTo("Routes.LoginScreen") { inclusive = true }
-                        }
+                        // PIN verification successful
+                        loginSuccess = true
                     } else {
-                        Toast.makeText(context, "${jsonResponse.getString("message")}", Toast.LENGTH_SHORT).show()
+                        // PIN verification failed
+                        errorMessage = jsonResponse.getString("message")
                     }
                 } catch (e: Exception) {
-                    Log.e("JSONError", "Error parsing JSON: $response", e)
-                    Toast.makeText(context, "Unexpected response from server", Toast.LENGTH_SHORT).show()
+                    errorMessage = "Unexpected response from server"
                 }
             },
-            Response.ErrorListener { error ->
-                Toast.makeText(context, "Login Failed! Please check your internet connection", Toast.LENGTH_SHORT).show()
+            Response.ErrorListener {
+                errorMessage = "Verification Failed! Please check your internet connection"
             }
         ) {
             override fun getParams(): MutableMap<String, String> {
                 val params = HashMap<String, String>()
-                params["pin"] = pin
+                params["pin"] = otpText // Use 'otpText' (the entered PIN)
+
+                // Ensure 'accountHolder' is not null before adding its fields
+                accountHolder?.let { holder ->
+                    params["cashierName"] = holder.name
+                    params["branch"] = holder.branch
+                } ?: run {
+                    // Handle case where 'accountHolder' is null
+                    Log.e("PinAccountInputScreen", "accountHolder is null")
+                    errorMessage = "User information is missing. Please log in again."
+                }
+
                 return params
             }
         }
@@ -122,7 +140,6 @@ fun PinAccountInputScreen(navController: NavController) {
             ) {
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Logo Placeholder
                 Icon(
                     painter = painterResource(id = R.drawable.password),
                     contentDescription = "Logo",
@@ -136,7 +153,6 @@ fun PinAccountInputScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Card to hold the "Enter PIN" text and OtpTextField
                 Card(
                     modifier = Modifier
                         .width(400.dp)
@@ -153,7 +169,6 @@ fun PinAccountInputScreen(navController: NavController) {
                             .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // "Enter PIN" text
                         Text(
                             text = "ENTER PIN",
                             style = MaterialTheme.typography.titleLarge,
@@ -164,7 +179,6 @@ fun PinAccountInputScreen(navController: NavController) {
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        // PIN TextField
                         OtpTextField(
                             otpText = otpText,
                             onValueChange = { otpText = it }
@@ -176,19 +190,16 @@ fun PinAccountInputScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(64.dp))
 
-                // Submit Button
                 Button(
                     onClick = {
                         if (otpText.isNotEmpty()) {
-                            Log.d("DEBUG", "Selecting data") // Log before inserting
-                            selectData(otpText)
+                            verifyPin(otpText) // Verify the PIN
                         } else {
                             Toast.makeText(context, "Please enter your PIN", Toast.LENGTH_SHORT).show()
                         }
-
                         focusManager.clearFocus()
                         if (otpText.length < 4) {
-                            Toast.makeText(context, "Please fill in all the fields", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "PIN must be 4 digits", Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier
@@ -199,6 +210,11 @@ fun PinAccountInputScreen(navController: NavController) {
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF008000))
                 ) {
                     Text(text = "SUBMIT", color = Color.White)
+                }
+
+                errorMessage?.let {
+                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                    errorMessage = null
                 }
             }
         }

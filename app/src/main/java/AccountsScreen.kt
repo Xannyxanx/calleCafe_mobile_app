@@ -48,13 +48,14 @@ import com.android.volley.Response
 import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import org.json.JSONObject
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountsScreen(navController: NavController) {
+fun AccountsScreen(navController: NavController, accountViewModel: AccountViewModel = viewModel()) {
+    val accountHolder = accountViewModel.accountHolder.collectAsState().value
     val focusManager = LocalFocusManager.current
-    //passing data of user from scanner screen to this screen
-    val cashierName = navController.currentBackStackEntry?.arguments?.getString("cashierName")?: "Unknown"
 
     val pin = remember { mutableStateOf("") }
     val seniorDiscount = remember { mutableStateOf("") }
@@ -62,33 +63,50 @@ fun AccountsScreen(navController: NavController) {
     val othersDiscount = remember { mutableStateOf("") }
     val context = LocalContext.current
 
-    //Logcat check kung napapasa yung data
-    Log.d("ScannerScreen", "Cashier Name: $cashierName")
-
-    fun updateData(pin: String) {
+    fun updateData(pin: String, cashierName: String, branch: String) {
         val url = "http://192.168.254.107/accounts.php"
         val requestQueue: RequestQueue = Volley.newRequestQueue(context)
+
         val stringRequest = object : StringRequest(
             Request.Method.POST, url,
             Response.Listener { response ->
                 val jsonResponse = JSONObject(response)
                 if (jsonResponse.getBoolean("success")) {
-                    Toast.makeText(context, "Your account's PIN has been updated!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Your account's PIN has been updated!",
+                        Toast.LENGTH_SHORT
+                    ).show()
                     navController.navigate("Routes.ScannerScreen") {
                         popUpTo("Routes.AccountsScreen") { inclusive = true }
                     }
                 } else {
-                    Toast.makeText(context, "Insert Failed: ${jsonResponse.getString("message")}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context,
+                        "Insert Failed: ${jsonResponse.getString("message")}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             },
             Response.ErrorListener { error ->
-                Toast.makeText(context, "Transaction Failed! Please check your internet connection", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    "Transaction Failed! Please check your internet connection",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         ) {
             override fun getParams(): MutableMap<String, String> {
                 val params = HashMap<String, String>()
-                params["name"] = cashierName
-                params["pin"] = pin
+                params["pin"] = pin // Use 'otpText' (the entered PIN)
+
+                accountHolder?.let { holder ->
+                    params["cashierName"] = holder.name
+                    params["branch"] = holder.branch
+                } ?: run {
+                    Log.e("PinAccountInputScreen", "accountHolder is null")
+                }
+
                 return params
             }
         }
@@ -96,12 +114,12 @@ fun AccountsScreen(navController: NavController) {
         requestQueue.add(stringRequest)
     }
 
-
     BackHandler {
         navController.navigate("Routes.ScannerScreen") {
             popUpTo("Routes.ScannerScreen") { inclusive = true }
         }
     }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -118,13 +136,12 @@ fun AccountsScreen(navController: NavController) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .background(Color(0xFF5C4033)) // Background color
+                    .background(Color(0xFF5C4033))
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Logo
                 Image(
-                    painter = painterResource(id = R.drawable.accounts), // logo
+                    painter = painterResource(id = R.drawable.accounts),
                     contentDescription = "Cafe Logo",
                     modifier = Modifier
                         .alpha(0.5f)
@@ -133,7 +150,6 @@ fun AccountsScreen(navController: NavController) {
                         .padding(bottom = 16.dp)
                 )
 
-                // Update Account
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -156,7 +172,7 @@ fun AccountsScreen(navController: NavController) {
                         )
                         Spacer(modifier = Modifier.height(24.dp))
                         Text(
-                            text = "Cashier Name: $cashierName",
+                            text = "Cashier Name: ${accountHolder?.name ?: "No User"}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.Black,
                             modifier = Modifier
@@ -179,17 +195,15 @@ fun AccountsScreen(navController: NavController) {
                                 focusedBorderColor = Color.Black,
                                 unfocusedBorderColor = Color.Black,
                                 focusedLabelColor = Color.Black,
-                                unfocusedLabelColor = Color.Black  )
+                                unfocusedLabelColor = Color.Black
+                            )
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                // Update Discounts
                 Card(
                     modifier = Modifier
-
                         .fillMaxWidth()
                         .padding(vertical = 8.dp),
                     shape = RoundedCornerShape(16.dp),
@@ -222,21 +236,20 @@ fun AccountsScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Submit Button
                 Button(
-                    onClick = { /* Handle submit */
+                    onClick = {
                         if (pin.value.isNotEmpty()) {
-                            Log.d("DEBUG", "updating account's PIN") // Log before inserting
-                            // Call updateData with cashierName and pin.value
-                            updateData(pin.value)
-                            Toast.makeText(context, "Changes successfully saved!", Toast.LENGTH_SHORT).show()
+                            Log.d("DEBUG", "updating account's PIN")
+                            accountHolder?.let {
+                                updateData(pin.value, it.name, it.branch)
+                            }
                         } else {
-                            Toast.makeText(context, "Please fill in all the fields", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "Please fill in all the fields",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
-
-
-                    Toast.makeText(context, "Changes successfully saved!",Toast.LENGTH_SHORT).show()
-
                     },
                     modifier = Modifier
                         .bounceClick()

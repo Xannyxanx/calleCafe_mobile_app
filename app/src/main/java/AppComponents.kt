@@ -80,12 +80,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 
-@OptIn(ExperimentalMaterial3Api::class)//app bar
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBar(
     title: String = "Calle Cafe",
     navController: NavController,
-    cashierName: String? = "Unknown"
+    cashierName: String? = "Unknown",
+    cashierBranch: String? = "Unknown"
 ) {
     var expanded by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
