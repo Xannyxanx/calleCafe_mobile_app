@@ -63,6 +63,7 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:1.1.0")
     implementation("androidx.camera:camera-view:1.0.0-alpha31")
     implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("com.google.code.gson:gson:2.10.1")
     val nav_version = "2.8.5"
     implementation("androidx.navigation:navigation-compose:$nav_version")
 }

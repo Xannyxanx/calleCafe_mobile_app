@@ -17,7 +17,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -50,6 +52,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.loginpage.DiscountPreferences
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.net.URLEncoder
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
@@ -86,6 +91,24 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
             "Others" -> discountPrefs.getDiscountPercentage("others")
             else -> 0f
         }
+    }
+
+    // Function to handle edit button click
+    fun handleEditButtonClick() {
+        // Create the pre-filled data
+        val preFilledData = mapOf(
+            "idNumber" to decodedIdNumber,
+            "name" to decodedName,
+            "city" to decodedCity,
+            "selectedItems" to decodedItemsList,
+            "citizenType" to citizenType
+        )
+
+        // Convert data to URL encoded string
+        val encodedData = URLEncoder.encode(Gson().toJson(preFilledData), "UTF-8")
+        
+        // Navigate to ManualScreen with the pre-filled data
+        navController.navigate("Routes.ManualScreen?prefilled=$encodedData")
     }
 
     //Wag galawin
@@ -154,139 +177,116 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
+                
                 // Logo
                 Image(
                     painter = painterResource(id = R.drawable.loginpageimage),
                     contentDescription = "Logo",
                     modifier = Modifier
-                        .height(100.dp)
-                        .width(100.dp)
+                        .height(80.dp)
+                        .width(80.dp)
                         .padding(bottom = 16.dp)
                         .alpha(0.5f)
                 )
 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Main Content Card
-                Card(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(8.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE0C1A6))
+                        .verticalScroll(rememberScrollState()) // Add scroll if content is too long
+                        .weight(1f, fill = true)
                 ) {
-                    Column(
+                    Card(
                         modifier = Modifier
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = CardDefaults.cardElevation(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE0C1A6))
                     ) {
-                        // Header
-                        Text(
-                            text = "ORDER CONFIRMATION",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = Color.White,
-                            modifier = Modifier
-                                .padding(8.dp)
-                                .background(Color(0xFF8B4513), shape = RoundedCornerShape(8.dp))
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Images
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.defaultimage),
-                                contentDescription = "Placeholder Image",
+                            // Header
+                            Text(
+                                text = "ORDER CONFIRMATION",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = Color.White,
                                 modifier = Modifier
-                                    .width(64.dp)
-                                    .height(64.dp)
-                                    .border(
-                                        width = 2.dp,
-                                        color = Color(0xFF8B4513),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
+                                    .padding(8.dp)
+                                    .background(Color(0xFF8B4513), shape = RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
                             )
-                            Image(
-                                painter = painterResource(id = R.drawable.defaultimage),
-                                contentDescription = "Placeholder Image",
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // White Box
+                            Box(
                                 modifier = Modifier
-                                    .width(64.dp)
-                                    .height(64.dp)
-                                    .border(
-                                        width = 2.dp,
-                                        color = Color(0xFF8B4513),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Placeholder White Rectangle
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .height(160.dp) // Increased height to accommodate discount info
-                                .background(Color.White, shape = RoundedCornerShape(8.dp))
-                        ){
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                                    .fillMaxWidth()
+                                    .height(180.dp)
+                                    .background(Color.White, shape = RoundedCornerShape(8.dp))
+                                    .padding(8.dp)
                             ) {
-                                Text(text = "Name: $decodedName", style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "ID Number: $decodedIdNumber", style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "City: $decodedCity", style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "Citizen Type: $citizenType", style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "Food: $decodedItemsList", style = MaterialTheme.typography.bodyLarge)
-                                if (discountPercentage.value > 0f) {
-                                    Text(
-                                        text = "Discount: ${discountPercentage.value}%",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = Color.Green
-                                    )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    verticalArrangement = Arrangement.SpaceEvenly
+                                ) {
+                                    Text(text = "Name: $decodedName", style = MaterialTheme.typography.bodyLarge)
+                                    Text(text = "ID Number: $decodedIdNumber", style = MaterialTheme.typography.bodyLarge)
+                                    Text(text = "City: $decodedCity", style = MaterialTheme.typography.bodyLarge)
+                                    Text(text = "Citizen Type: $citizenType", style = MaterialTheme.typography.bodyLarge)
+                                    Text(text = "Food: $decodedItemsList", style = MaterialTheme.typography.bodyLarge)
+                                    if (discountPercentage.value > 0f) {
+                                        Text(
+                                            text = "Discount: ${discountPercentage.value}%",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = Color.Green
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
                     }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // Adjusted Spacer for bottom elements
-                Spacer(modifier = Modifier.height(62.dp))
-
-                // Food Icon buttons
+                // Buttons at the bottom
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
+                        .padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Button(
                         modifier = Modifier
-                            .bounceClick()
+                            .weight(1f)
+                            .padding(end = 4.dp)
                             .height(48.dp),
                         onClick = {
-                            navController.navigate("Routes.ScannerScreen") {
-                                popUpTo("Routes.ScannerScreen") { inclusive = true }
-                            }
+                            handleEditButtonClick()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDAA520))
                     ) {
                         Text(text = "EDIT", color = Color.White)
                     }
 
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     Button(
                         modifier = Modifier
-                            .bounceClick()
+                            .weight(1f)
+                            .padding(start = 4.dp)
                             .height(48.dp),
                         onClick = {
-                            showConfirmDialog = true // Show the confirmation dialog
+                            showConfirmDialog = true
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF008000))
                     ) {
@@ -294,7 +294,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                     }
                 }
 
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.height(16.dp)) // Add extra space at the bottom
             }
         }
     }

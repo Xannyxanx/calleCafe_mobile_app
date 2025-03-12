@@ -45,6 +45,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TextFieldDefaults.outlinedTextFieldColors
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,20 +65,25 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import java.net.URLDecoder
 import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun ManualScreen(navController: NavController, accountViewModel: AccountViewModel = viewModel(),  selectedItemsFromScanner: List<String> = emptyList()) {
+fun ManualScreen(
+    navController: NavController,
+    accountViewModel: AccountViewModel = viewModel(),
+    selectedItemsFromScanner: List<String> = emptyList(),
+    prefilled: String? = null
+) {
     val accountHolder = accountViewModel.accountHolder.collectAsState().value
     val focusManager = LocalFocusManager.current
     val idNumberInputManual = remember { mutableStateOf("") }
     val nameInputManual = remember { mutableStateOf("") }
     val cityInputManual = remember { mutableStateOf("") }
-    val disabilityOptions = listOf("Orthopedic", "Chronic", "Visual", "Communication", "Learning", "Mental", "Psychosocial")
-    val selectedDisability = remember { mutableStateOf(disabilityOptions[0]) }
-    val expanded = remember { mutableStateOf(false) }
     val isPWDSelected = remember { mutableStateOf(false) }
     val isSeniorCitizenSelected = remember { mutableStateOf(false) }
     val isOthersSelected = remember { mutableStateOf(false) }
@@ -86,6 +92,22 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
     val selectedItems = remember { mutableStateListOf<String>().apply {
         addAll(selectedItemsFromScanner)
     } }
+
+    val gson = Gson()
+
+    val preFilledData = remember {
+        try {
+            prefilled?.let {
+                val decoded = URLDecoder.decode(it, "UTF-8")
+                gson.fromJson<Map<String, String>>(
+                    decoded,
+                    object : TypeToken<Map<String, String>>() {}.type
+                )
+            } ?: emptyMap()
+        } catch (e: Exception) {
+            emptyMap<String, String>()
+        }
+    }
 
     BackHandler {
         val previousRoute = navController.previousBackStackEntry?.destination?.route
@@ -97,6 +119,33 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
         } else {
             // Otherwise, navigate back
             navController.popBackStack()
+        }
+    }
+
+    LaunchedEffect(preFilledData) {
+        if (preFilledData.isNotEmpty()) {
+            idNumberInputManual.value = preFilledData["idNumber"] ?: ""
+            nameInputManual.value = preFilledData["name"] ?: ""
+            cityInputManual.value = preFilledData["city"] ?: ""
+            
+            val itemsList = preFilledData["selectedItems"]?.split(",") ?: emptyList()
+            selectedItems.clear()
+            selectedItems.addAll(itemsList)
+
+            when (preFilledData["citizenType"]) {
+                "PWD" -> {
+                    isPWDSelected.value = true
+                    selectedCitizenType.value = "PWD"
+                }
+                "Senior Citizen" -> {
+                    isSeniorCitizenSelected.value = true
+                    selectedCitizenType.value = "Senior Citizen"
+                }
+                "Others" -> {
+                    isOthersSelected.value = true
+                    selectedCitizenType.value = "Others"
+                }
+            }
         }
     }
 
@@ -255,51 +304,62 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // Discount Buttons
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            // PWD Button
-                            Button(
-                                onClick = {
-                                    if (isPWDSelected.value) {
-                                        selectedCitizenType.value = ""
-                                        isPWDSelected.value = false
-                                    } else {
-                                        selectedCitizenType.value = "PWD"
-                                        isPWDSelected.value = true
-                                        isSeniorCitizenSelected.value = false
-                                        isOthersSelected.value = false
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isPWDSelected.value) Color(0xFF6B4F3C) else Color(0xFF8B4513)
-                                )
+                            // First row for PWD and Senior Citizen
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(text = "PWD", color = Color.White)
+                                // PWD Button
+                                Button(
+                                    onClick = {
+                                        if (isPWDSelected.value) {
+                                            selectedCitizenType.value = ""
+                                            isPWDSelected.value = false
+                                        } else {
+                                            selectedCitizenType.value = "PWD"
+                                            isPWDSelected.value = true
+                                            isSeniorCitizenSelected.value = false
+                                            isOthersSelected.value = false
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).padding(end = 4.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isPWDSelected.value) Color(0xFF6B4F3C) else Color(0xFF8B4513)
+                                    )
+                                ) {
+                                    Text(text = "PWD", color = Color.White)
+                                }
+
+                                // Senior Citizen Button
+                                Button(
+                                    onClick = {
+                                        if (isSeniorCitizenSelected.value) {
+                                            selectedCitizenType.value = ""
+                                            isSeniorCitizenSelected.value = false
+                                        } else {
+                                            selectedCitizenType.value = "Senior Citizen"
+                                            isSeniorCitizenSelected.value = true
+                                            isPWDSelected.value = false
+                                            isOthersSelected.value = false
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f).padding(start = 4.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isSeniorCitizenSelected.value) Color(0xFF6B4F3C) else Color(0xFF8B4513)
+                                    )
+                                ) {
+                                    Text(text = "Senior Citizen", color = Color.White)
+                                }
                             }
 
-                            // Senior Citizen Button
-                            Button(
-                                onClick = {
-                                    if (isSeniorCitizenSelected.value) {
-                                        selectedCitizenType.value = ""
-                                        isSeniorCitizenSelected.value = false
-                                    } else {
-                                        selectedCitizenType.value = "Senior Citizen"
-                                        isSeniorCitizenSelected.value = true
-                                        isPWDSelected.value = false
-                                        isOthersSelected.value = false
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isSeniorCitizenSelected.value) Color(0xFF6B4F3C) else Color(0xFF8B4513)
-                                )
-                            ) {
-                                Text(text = "Senior Citizen", color = Color.White)
-                            }
+                            // Space between rows
+                            Spacer(modifier = Modifier.height(8.dp))
 
                             // Others Button
                             Button(
@@ -314,6 +374,9 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
                                         isSeniorCitizenSelected.value = false
                                     }
                                 },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp), // Set fixed height
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isOthersSelected.value) Color(0xFF6B4F3C) else Color(0xFF8B4513)
                                 )
@@ -323,46 +386,6 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
-
-                        // Disability Dropdown
-                        ExposedDropdownMenuBox(
-                            expanded = expanded.value,
-                            onExpandedChange = { expanded.value = !expanded.value },
-                            modifier = Modifier.border(BorderStroke(1.dp, Color.Black))
-                        ) {
-                            TextField(
-                                value = selectedDisability.value,
-                                onValueChange = {},
-                                readOnly = true,
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value)
-                                },
-                                modifier = Modifier
-                                    .menuAnchor()
-                                    .fillMaxWidth(),
-                                label = { Text("Type of Disability", color = Color.Black) },
-                                colors = ExposedDropdownMenuDefaults.textFieldColors(
-                                    unfocusedIndicatorColor = Color.Transparent,
-                                    focusedIndicatorColor = Color.Transparent,
-                                    unfocusedContainerColor = Color.Transparent,
-                                    focusedContainerColor = Color.Transparent
-                                )
-                            )
-                            ExposedDropdownMenu(
-                                expanded = expanded.value,
-                                onDismissRequest = { expanded.value = false },
-                            ) {
-                                disabilityOptions.forEach { option ->
-                                    DropdownMenuItem(
-                                        text = { Text(option) },
-                                        onClick = {
-                                            selectedDisability.value = option
-                                            expanded.value = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
                     }
                 }
 

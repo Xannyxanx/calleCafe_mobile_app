@@ -73,6 +73,7 @@ fun RegistrationScreen(
     val expanded = remember { mutableStateOf(false) }
     val nameInputRegistration = remember { mutableStateOf("") }
     val pinInputRegistration = remember { mutableStateOf("") }
+    val usernameInputRegistration = remember { mutableStateOf("") }
     val context = LocalContext.current
 
     fun insertData(branchDb: String, nameDb: String, pinDb: String) {
@@ -127,19 +128,9 @@ fun RegistrationScreen(
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Logo
-                Icon(
-                    painter = painterResource(id = R.drawable.registration),
-                    contentDescription = "Logo",
-                    modifier = Modifier
-                        .alpha(0.5f)
-                        .height(100.dp)
-                        .width(100.dp)
-                        .padding(bottom = 16.dp),
-                    tint = Color.Unspecified
-                )
 
-                // Pushes content upward if needed
+                Spacer(modifier = Modifier.height(30.dp))
+
 
                 // Main content card
                 Card(
@@ -240,6 +231,32 @@ fun RegistrationScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        //Username Input Field
+                        OutlinedTextField(
+                            value = usernameInputRegistration.value,
+                            onValueChange = { input ->
+                                usernameInputRegistration.value = input
+                            },
+                            label = { Text("Input Username") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Text,
+                                imeAction = ImeAction.Done,
+                                autoCorrect = false
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { focusManager.clearFocus() }
+                            ),
+                            colors = outlinedTextFieldColors(
+                                focusedBorderColor = Color.Black,
+                                unfocusedBorderColor = Color.Black,
+                                focusedLabelColor = Color.Black,
+                                unfocusedLabelColor = Color.Black
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
                         // PIN Input Field
                         OutlinedTextField(
                             value = pinInputRegistration.value,
@@ -268,8 +285,6 @@ fun RegistrationScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(30.dp))
-
                 // Submit Button
                 Button(
                     onClick = {
@@ -292,7 +307,7 @@ fun RegistrationScreen(
                     },
                     modifier = Modifier
                         .bounceClick()
-                        .height(64.dp)
+                        .height(70.dp)
                         .align(Alignment.CenterHorizontally)
                         .padding(vertical = 16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF008000))

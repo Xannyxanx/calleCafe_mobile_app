@@ -29,6 +29,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextFieldDefaults.outlinedTextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -62,7 +63,7 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
     val pin = remember { mutableStateOf("") }
     val context = LocalContext.current
     val discountPrefs = remember { DiscountPreferences(context) }
-
+    val usernameInputAccount = remember { mutableStateOf("") }
     val seniorDiscount = remember { mutableStateOf(discountPrefs.getDiscountPercentage("senior").toString()) }
     val pwdDiscount = remember { mutableStateOf(discountPrefs.getDiscountPercentage("pwd").toString()) }
     val othersDiscount = remember { mutableStateOf(discountPrefs.getDiscountPercentage("others").toString()) }
@@ -147,18 +148,19 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .background(Color(0xFF5C4033))
+                    .background(Color(0xFF5C4033)) // Background color
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Logo
                 Image(
-                    painter = painterResource(id = R.drawable.accounts),
+                    painter = painterResource(id = R.drawable.accounts), // logo
                     contentDescription = "Cafe Logo",
                     modifier = Modifier
                         .alpha(0.5f)
-                        .height(100.dp)
-                        .width(100.dp)
-                        .padding(bottom = 16.dp)
+                        .height(60.dp)
+                        .width(60.dp)
+                        .padding(bottom = 10.dp)
                 )
 
                 Card(
@@ -206,13 +208,36 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
                                 focusedBorderColor = Color.Black,
                                 unfocusedBorderColor = Color.Black,
                                 focusedLabelColor = Color.Black,
+                                unfocusedLabelColor = Color.Black  )
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = usernameInputAccount.value,
+                            onValueChange = {
+                                if (it.matches(Regex("^[A-Za-z.,-]*$"))) {
+                                    usernameInputAccount.value = it
+                                }
+                            },
+                            label = { Text("Enter New Username") },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                                autoCorrect = false
+                            ),
+                            colors = outlinedTextFieldColors(
+                                focusedBorderColor = Color.Black,
+                                unfocusedBorderColor = Color.Black,
+                                focusedLabelColor = Color.Black,
                                 unfocusedLabelColor = Color.Black
                             )
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
+
                     }
                 }
+
                 Spacer(modifier = Modifier.height(16.dp))
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()

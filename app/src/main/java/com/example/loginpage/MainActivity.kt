@@ -93,9 +93,14 @@ class MainActivity : ComponentActivity() {
                     ConfirmationScreen(navController = navController, name = name, idNumber = idNumber, city = city, items = items)
                 }
                 composable(
-                    "Routes.ManualScreen?selectedItems={selectedItems}",
+                    "Routes.ManualScreen?selectedItems={selectedItems}&prefilled={prefilled}",
                     arguments = listOf(
                         navArgument("selectedItems") {
+                            type = NavType.StringType
+                            defaultValue = ""
+                            nullable = true
+                        },
+                        navArgument("prefilled") {
                             type = NavType.StringType
                             defaultValue = ""
                             nullable = true
@@ -103,6 +108,8 @@ class MainActivity : ComponentActivity() {
                     )
                 ) { backStackEntry ->
                     val encodedItems = backStackEntry.arguments?.getString("selectedItems") ?: ""
+                    val prefilled = backStackEntry.arguments?.getString("prefilled") ?: ""
+                    
                     val selectedItems = try {
                         URLDecoder.decode(encodedItems, "UTF-8").split(",").filter { it.isNotEmpty() }
                     } catch (e: Exception) {
@@ -112,7 +119,8 @@ class MainActivity : ComponentActivity() {
                     ManualScreen(
                         navController = navController,
                         accountViewModel = accountViewModel,
-                        selectedItemsFromScanner = selectedItems
+                        selectedItemsFromScanner = selectedItems,
+                        prefilled = prefilled
                     )
                 }
 

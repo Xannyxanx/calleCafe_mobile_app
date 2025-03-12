@@ -33,7 +33,7 @@ fun LoginScreen(navController: NavController) {
 
 
         fun selectData(pin: String) {
-                val url = "http://192.168.254.107/login.php"
+                val url = "http://192.168.254.107/CalleCafe/login.php"
                 val requestQueue: RequestQueue = Volley.newRequestQueue(context)
 
                 //Connection to database
@@ -97,6 +97,7 @@ fun LoginScreen(navController: NavController) {
                                 .width(350.dp)
                                 .padding(bottom = 16.dp)
                 )
+
 
                 Spacer(modifier = Modifier.height(32.dp))
 
