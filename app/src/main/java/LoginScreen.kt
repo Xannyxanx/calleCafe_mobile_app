@@ -1,7 +1,9 @@
 package com.example.loginpage
 
+import android.app.Activity
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -74,6 +76,10 @@ fun LoginScreen(navController: NavController) {
 
 
 
+        BackHandler {
+                // Exit the app when back is pressed on LoginScreen
+                (context as? Activity)?.finish()
+        }
 
         Column(
                 modifier = Modifier

@@ -119,8 +119,15 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
     }
 
     BackHandler {
-        navController.navigate("Routes.ScannerScreen") {
-            popUpTo("Routes.ScannerScreen") { inclusive = true }
+        val previousRoute = navController.previousBackStackEntry?.destination?.route
+        if (previousRoute == "Routes.LoginScreen" || previousRoute == "Routes.PinInputScreen") {
+            // Pop the ScannerScreen from the stack inclusively
+            navController.popBackStack(route = "Routes.LoginScreen", inclusive = true)
+            // Exit the app
+            (context as? android.app.Activity)?.finishAffinity() // Graceful exit
+        } else {
+            // Otherwise, navigate back
+            navController.popBackStack()
         }
     }
 

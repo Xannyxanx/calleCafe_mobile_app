@@ -11,6 +11,6 @@ class AccountViewModel : ViewModel() {
     val accountHolder: StateFlow<AccountHolder?> = _accountHolder
 
     fun setAccount(account: AccountHolder) {
-        _accountHolder.value = accountasdasdsa
+        _accountHolder.value = account
     }
 }

@@ -47,7 +47,9 @@ import com.android.volley.toolbox.Volley
 import org.json.JSONObject
 import java.net.URLDecoder
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.loginpage.DiscountPreferences
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
@@ -63,6 +65,28 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
     val decodedName = URLDecoder.decode(name, "UTF-8")
     val decodedIdNumber = URLDecoder.decode(idNumber, "UTF-8")
     val decodedCity = URLDecoder.decode(city, "UTF-8")
+
+    // Decode the items correctly
+    val decodedData = URLDecoder.decode(items, "UTF-8").split("&")
+    val dataMap = decodedData.associate {
+        val parts = it.split("=")
+        parts[0] to parts[1]
+    }
+    
+    val citizenType = dataMap["CitizenType"] ?: ""
+    val decodedItemsList = dataMap["Items"] ?: ""
+
+    val discountPrefs = remember { DiscountPreferences(context) }
+    val discountPercentage = remember { mutableStateOf(0f) }
+
+    LaunchedEffect(citizenType) {
+        discountPercentage.value = when (citizenType) {
+            "PWD" -> discountPrefs.getDiscountPercentage("pwd")
+            "Senior Citizen" -> discountPrefs.getDiscountPercentage("senior")
+            "Others" -> discountPrefs.getDiscountPercentage("others")
+            else -> 0f
+        }
+    }
 
     //Wag galawin
     fun insertData(idNumber: String, name: String, disability: String) {
@@ -99,7 +123,16 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
 
     // Disable back key
     BackHandler {
-        Toast.makeText(context, "Back button disabled on this screen.", Toast.LENGTH_SHORT).show()
+        val previousRoute = navController.previousBackStackEntry?.destination?.route
+        if (previousRoute == "Routes.LoginScreen" || previousRoute == "Routes.PinInputScreen") {
+            // Pop the ScannerScreen from the stack inclusively
+            navController.popBackStack(route = "Routes.LoginScreen", inclusive = true)
+            // Exit the app
+            (context as? android.app.Activity)?.finishAffinity() // Graceful exit
+        } else {
+            // Otherwise, navigate back
+            navController.popBackStack()
+        }
     }
 
     Box(
@@ -198,7 +231,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
-                                .height(100.dp)
+                                .height(160.dp) // Increased height to accommodate discount info
                                 .background(Color.White, shape = RoundedCornerShape(8.dp))
                         ){
                             Column(
@@ -208,7 +241,15 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                                 Text(text = "Name: $decodedName", style = MaterialTheme.typography.bodyLarge)
                                 Text(text = "ID Number: $decodedIdNumber", style = MaterialTheme.typography.bodyLarge)
                                 Text(text = "City: $decodedCity", style = MaterialTheme.typography.bodyLarge)
-                                Text(text = "Food: $decodedItems", style = MaterialTheme.typography.bodyLarge)
+                                Text(text = "Citizen Type: $citizenType", style = MaterialTheme.typography.bodyLarge)
+                                Text(text = "Food: $decodedItemsList", style = MaterialTheme.typography.bodyLarge)
+                                if (discountPercentage.value > 0f) {
+                                    Text(
+                                        text = "Discount: ${discountPercentage.value}%",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = Color.Green
+                                    )
+                                }
                             }
                         }
 

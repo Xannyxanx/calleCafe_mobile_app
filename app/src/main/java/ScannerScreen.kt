@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import java.util.Scanner
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.ViewGroup
@@ -127,8 +128,15 @@ fun ScannerScreen(navController: NavController, accountViewModel: AccountViewMod
     Log.d("ScannerScreen", "Cashier Name: $cashierName")
 
     BackHandler {
-        navController.navigate("Routes.LoginScreen") {
-            popUpTo("Routes.LoginScreen") { inclusive = true }
+        val previousRoute = navController.previousBackStackEntry?.destination?.route
+        if (previousRoute == "Routes.LoginScreen" || previousRoute == "Routes.PinInputScreen") {
+            // Clear the entire stack
+            navController.popBackStack(route = "Routes.LoginScreen", inclusive = true)
+            // Exit the app
+            (context as? Activity)?.finishAffinity()
+        } else {
+            // Otherwise, navigate back
+            navController.popBackStack()
         }
     }
 
@@ -274,6 +282,55 @@ fun ScannerScreen(navController: NavController, accountViewModel: AccountViewMod
     }
 }
 
+private val pwdKeywords = listOf(
+    "PWD", "PERSONS WITH DISABILITY", "DISABILITY", "PWD ID", "PWD IDENTIFICATION",
+    "PHILHEALTH", "DISABILITY ID", "DISABILITY CARD", "PSYCHOSOCIAL", "MENTAL", "PHYSICAL", "VISUAL",
+    "HEARING", "LEARNING", "SPEECH", "ORTHOPEDIC", "VISION", "IMPAIRMENT"
+)
+
+private val seniorCitizenKeywords = listOf(
+    "SENIOR CITIZEN", "OSCA", "SENIOR CITIZEN ID", "OSCA ID", "SENIOR CITIZEN CARD",
+    "OFFICE OF THE SENIOR CITIZENS AFFAIRS", "OSCA IDENTIFICATION"
+)
+
+private fun detected(visionText: Text): Boolean {
+    val allKeywords = pwdKeywords + seniorCitizenKeywords
+    val text = visionText.text
+    return allKeywords.any { keyword -> text.contains(keyword, ignoreCase = true) }
+}
+
+private fun processText(visionText: Text, context: android.content.Context, navController: NavController, selectedItems: List<String>) {
+    if (!detected(visionText)) {
+        Log.d("ProcessText", "Not a PWD or Senior Citizen ID. Skipping extraction.")
+        return
+    }
+
+    val citizenType = when {
+        pwdKeywords.any { keyword -> visionText.text.contains(keyword, ignoreCase = true) } -> "PWD"
+        seniorCitizenKeywords.any { keyword -> visionText.text.contains(keyword, ignoreCase = true) } -> "Senior Citizen"
+        else -> "" 
+    }
+
+    val fullText = visionText.textBlocks.joinToString("\n") { it.text }
+    val name = extractName(fullText)
+    val idNumber = extractIdNumber(fullText)
+    val city = extractCity(fullText)
+
+    val data = listOf(
+        "CitizenType=$citizenType",
+        "Items=${selectedItems.joinToString(",")}"
+    ).joinToString("&")
+
+    Log.d("ProcessText", "Extracted Name: $name")
+    Log.d("ProcessText", "Extracted ID Number: $idNumber")
+    Log.d("ProcessText", "Extracted City: $city")
+    Log.d("ProcessText", "Citizen Type: $citizenType")
+    Log.d("ProcessText", "Selected Items: $selectedItems")
+
+    val encodedData = URLEncoder.encode(data, "UTF-8")
+    navController.navigate("Routes.ConfirmationScreen/$name/$idNumber/$city/$encodedData")
+}
+
 private fun startCamera(
     cameraProviderFuture: ListenableFuture<ProcessCameraProvider>,
     lifecycleOwner: LifecycleOwner,
@@ -355,43 +412,6 @@ private fun processImageForTextRecognition(
         imageProxy.close()
         isScanning.value = false // Reset scanning state if no media image
     }
-}
-
-private fun processText(visionText: Text, context: android.content.Context, navController: NavController, selectedItems: List<String>) {
-    if (!detected(visionText)) {
-        Log.d("ProcessText", "Not a PWD or Senior Citizen ID. Skipping extraction.")
-        return
-    }
-
-    val fullText = visionText.textBlocks.joinToString("\n") { it.text }
-    val name = extractName(fullText)
-    val idNumber = extractIdNumber(fullText)
-    val city = extractCity(fullText)
-    val items = selectedItems.joinToString(",")
-
-    Log.d("ProcessText", "Extracted Name: $name")
-    Log.d("ProcessText", "Extracted ID Number: $idNumber")
-    Log.d("ProcessText", "Extracted City: $city")
-    Log.d("ProcessText", "Selected Items: $items")
-
-    // Navigate to ConfirmationScreen with the extracted data and selected items
-    val encodedItems = URLEncoder.encode(items, "UTF-8")
-    navController.navigate("confirmation_screen/$name/$idNumber/$city/$encodedItems")
-}
-
-private fun detected(visionText: Text): Boolean {
-    val pwdKeywords = listOf(
-        "PWD", "PERSONS WITH DISABILITY", "DISABILITY", "PWD ID", "PWD IDENTIFICATION",
-        "PHILHEALTH", "DISABILITY ID", "DISABILITY CARD", "PSYCHOSOCIAL", "MENTAL", "PHYSICAL", "VISUAL",
-        "HEARING", "LEARNING", "SPEECH", "ORTHOPEDIC", "VISION", "IMPAIRMENT"
-    )
-    val seniorCitizenKeywords = listOf(
-        "SENIOR CITIZEN", "OSCA", "SENIOR CITIZEN ID", "OSCA ID", "SENIOR CITIZEN CARD",
-        "OFFICE OF THE SENIOR CITIZENS AFFAIRS", "OSCA IDENTIFICATION"
-    )
-    val keywords = pwdKeywords + seniorCitizenKeywords
-    val text = visionText.text
-    return keywords.any { keyword -> text.contains(keyword, ignoreCase = true) }
 }
 
 private fun extractName(text: String): String {

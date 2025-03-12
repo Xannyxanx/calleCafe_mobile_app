@@ -81,14 +81,22 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
     val isPWDSelected = remember { mutableStateOf(false) }
     val isSeniorCitizenSelected = remember { mutableStateOf(false) }
     val isOthersSelected = remember { mutableStateOf(false) }
+    val selectedCitizenType = remember { mutableStateOf("") } // Changed to mutableStateOf("")
     val context = LocalContext.current
     val selectedItems = remember { mutableStateListOf<String>().apply {
         addAll(selectedItemsFromScanner)
     } }
 
     BackHandler {
-        navController.navigate("Routes.ScannerScreen") {
-            popUpTo("Routes.ScannerScreen") { inclusive = true }
+        val previousRoute = navController.previousBackStackEntry?.destination?.route
+        if (previousRoute == "Routes.LoginScreen" || previousRoute == "Routes.PinInputScreen") {
+            // Pop the ScannerScreen from the stack inclusively
+            navController.popBackStack(route = "Routes.LoginScreen", inclusive = true)
+            // Exit the app
+            (context as? android.app.Activity)?.finishAffinity() // Graceful exit
+        } else {
+            // Otherwise, navigate back
+            navController.popBackStack()
         }
     }
 
@@ -256,7 +264,15 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
                             // PWD Button
                             Button(
                                 onClick = {
-                                    isPWDSelected.value = !isPWDSelected.value // Toggle PWD button
+                                    if (isPWDSelected.value) {
+                                        selectedCitizenType.value = ""
+                                        isPWDSelected.value = false
+                                    } else {
+                                        selectedCitizenType.value = "PWD"
+                                        isPWDSelected.value = true
+                                        isSeniorCitizenSelected.value = false
+                                        isOthersSelected.value = false
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isPWDSelected.value) Color(0xFF6B4F3C) else Color(0xFF8B4513)
@@ -268,7 +284,15 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
                             // Senior Citizen Button
                             Button(
                                 onClick = {
-                                    isSeniorCitizenSelected.value = !isSeniorCitizenSelected.value // Toggle Senior Citizen button
+                                    if (isSeniorCitizenSelected.value) {
+                                        selectedCitizenType.value = ""
+                                        isSeniorCitizenSelected.value = false
+                                    } else {
+                                        selectedCitizenType.value = "Senior Citizen"
+                                        isSeniorCitizenSelected.value = true
+                                        isPWDSelected.value = false
+                                        isOthersSelected.value = false
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isSeniorCitizenSelected.value) Color(0xFF6B4F3C) else Color(0xFF8B4513)
@@ -280,7 +304,15 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
                             // Others Button
                             Button(
                                 onClick = {
-                                    isOthersSelected.value = !isOthersSelected.value // Toggle Others button
+                                    if (isOthersSelected.value) {
+                                        selectedCitizenType.value = ""
+                                        isOthersSelected.value = false
+                                    } else {
+                                        selectedCitizenType.value = "Others"
+                                        isOthersSelected.value = true
+                                        isPWDSelected.value = false
+                                        isSeniorCitizenSelected.value = false
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (isOthersSelected.value) Color(0xFF6B4F3C) else Color(0xFF8B4513)
@@ -339,21 +371,32 @@ fun ManualScreen(navController: NavController, accountViewModel: AccountViewMode
                 // Submit Button
                 Button(
                     onClick = {
-                        // Validate input fields
                         if (idNumberInputManual.value.isBlank() ||
                             nameInputManual.value.isBlank() ||
                             cityInputManual.value.isBlank() ||
-                            selectedItems.isEmpty()) {
-                            Toast.makeText(context, "Please fill all fields and select items", Toast.LENGTH_SHORT).show()
+                            selectedItems.isEmpty() ||
+                            selectedCitizenType.value.isBlank()) {
+                            Toast.makeText(
+                                context,
+                                "Please fill all fields, select items and choose a citizen type",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         } else {
-                            // URL encode values
+                            // Create the data string properly
+                            val data = listOf(
+                                "CitizenType=${selectedCitizenType.value}",
+                                "Items=${selectedItems.joinToString(",")}"
+                            ).joinToString("&")
+                            
+                            // URL encode the data
+                            val encodedData = URLEncoder.encode(data, "UTF-8")
+                            
                             val name = URLEncoder.encode(nameInputManual.value, "UTF-8")
                             val idNumber = URLEncoder.encode(idNumberInputManual.value, "UTF-8")
                             val city = URLEncoder.encode(cityInputManual.value, "UTF-8")
-                            val items = URLEncoder.encode(selectedItems.joinToString(","), "UTF-8")
-
-                            // Navigate to ConfirmationScreen with encoded values
-                            navController.navigate("Routes.ConfirmationScreen/$name/$idNumber/$city/$items")
+                            
+                            // Navigate with the encoded values
+                            navController.navigate("Routes.ConfirmationScreen/$name/$idNumber/$city/$encodedData")
                         }
                     },
                     modifier = Modifier
