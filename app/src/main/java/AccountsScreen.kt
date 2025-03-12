@@ -68,7 +68,7 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
     val pwdDiscount = remember { mutableStateOf(discountPrefs.getDiscountPercentage("pwd").toString()) }
     val othersDiscount = remember { mutableStateOf(discountPrefs.getDiscountPercentage("others").toString()) }
 
-    fun updateData(pin: String, cashierName: String, branch: String) {
+    fun updateData(pin: String, username:String, cashierName: String, branch: String) {
         val url = "http://192.168.254.107/accounts.php"
         val requestQueue: RequestQueue = Volley.newRequestQueue(context)
 
@@ -79,7 +79,7 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
                 if (jsonResponse.getBoolean("success")) {
                     Toast.makeText(
                         context,
-                        "Your account's PIN has been updated!",
+                        "Your account's Information has been updated!",
                         Toast.LENGTH_SHORT
                     ).show()
                     navController.navigate("Routes.ScannerScreen") {
@@ -104,7 +104,7 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
             override fun getParams(): MutableMap<String, String> {
                 val params = HashMap<String, String>()
                 params["pin"] = pin // Use 'otpText' (the entered PIN)
-
+                params["username"] = username
                 accountHolder?.let { holder ->
                     params["cashierName"] = holder.name
                     params["branch"] = holder.branch
@@ -215,7 +215,7 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
                         OutlinedTextField(
                             value = usernameInputAccount.value,
                             onValueChange = {
-                                if (it.matches(Regex("^[A-Za-z.,-]*$"))) {
+                                if (it.matches(Regex("^[A-Za-z0-9]*$"))) {
                                     usernameInputAccount.value = it
                                 }
                             },
@@ -305,7 +305,7 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
                         if (pin.value.isNotEmpty()) {
                             Log.d("DEBUG", "updating account's PIN")
                             accountHolder?.let {
-                                updateData(pin.value, it.name, it.branch)
+                                updateData(pin.value, usernameInputAccount.value, it.name, it.branch)
                             }
                         } else {
                             Toast.makeText(

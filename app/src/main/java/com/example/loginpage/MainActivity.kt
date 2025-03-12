@@ -41,8 +41,9 @@ class MainActivity : ComponentActivity() {
                     RegistrationScreen(navController)
                 }
                 //NEW PIN INPUT SCREEN
-                composable("Routes.PinInputScreen") {
-                    PinInputScreen(navController, accountViewModel)
+                composable("Routes.PinInputScreen/{username}") { backStackEntry ->
+                    val username = backStackEntry.arguments?.getString("username") ?: ""
+                    PinInputScreen(navController, username, accountViewModel)
                 }
                 composable("Routes.PinAccountInputScreen"){
                     PinAccountInputScreen(navController, accountViewModel)

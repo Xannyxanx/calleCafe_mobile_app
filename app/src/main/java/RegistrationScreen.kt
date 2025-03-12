@@ -76,7 +76,7 @@ fun RegistrationScreen(
     val usernameInputRegistration = remember { mutableStateOf("") }
     val context = LocalContext.current
 
-    fun insertData(branchDb: String, nameDb: String, pinDb: String) {
+    fun insertData(branchDb: String, nameDb: String, pinDb: String, usernameDb: String) {
         val url = "http://192.168.254.107/CalleCafe/mobile/registeredAccounts.php"
         val requestQueue: RequestQueue = Volley.newRequestQueue(context)
         val stringRequest = object : StringRequest(
@@ -98,7 +98,8 @@ fun RegistrationScreen(
                 val params = HashMap<String, String>()
                 params["branch"] = branchDb
                 params["name"] = nameDb
-                params["pin"] = pinDb
+                params["pin"] = pinDb // PIN is now preserved as a string
+                params["username"] = usernameDb
                 return params
             }
         }
@@ -234,8 +235,10 @@ fun RegistrationScreen(
                         //Username Input Field
                         OutlinedTextField(
                             value = usernameInputRegistration.value,
-                            onValueChange = { input ->
-                                usernameInputRegistration.value = input
+                            onValueChange = { newValue ->
+                                if (newValue.matches(Regex("^[A-Za-z0-9]*$"))) {
+                                    usernameInputRegistration.value = newValue
+                                }
                             },
                             label = { Text("Input Username") },
                             modifier = Modifier.fillMaxWidth(),
@@ -268,7 +271,7 @@ fun RegistrationScreen(
                             label = { Text("Input PIN") },
                             modifier = Modifier.fillMaxWidth(),
                             keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
+                                keyboardType = KeyboardType.Number,  
                                 imeAction = ImeAction.Done
                             ),
                             keyboardActions = KeyboardActions(
@@ -291,6 +294,7 @@ fun RegistrationScreen(
                         val branchDb = selectedStore.value
                         val nameDb = nameInputRegistration.value
                         val pinDb = pinInputRegistration.value
+                        val usernameDb = usernameInputRegistration.value
 
                         navController.navigate("Routes.LoginScreen")
                         //****** IMPORTANT, Code to save data into the database
@@ -299,7 +303,7 @@ fun RegistrationScreen(
 
                         if (branchDb.isNotEmpty() && nameDb.isNotEmpty() && pinDb.isNotEmpty()) {
                             Log.d("DEBUG", "Inserting data")
-                            insertData(branchDb, nameDb, pinDb)
+                            insertData(branchDb, nameDb, pinDb, usernameDb)
                         } else {
                             Toast.makeText(context, "Please fill in all the fields", Toast.LENGTH_SHORT).show()
                         }

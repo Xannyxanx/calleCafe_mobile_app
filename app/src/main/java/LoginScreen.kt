@@ -30,7 +30,8 @@ fun LoginScreen(navController: NavController) {
         var showPinDialog by remember { mutableStateOf(false) }
         var pin by remember { mutableStateOf("") }
         val context = LocalContext.current
-
+        var showUsernameDialog by remember { mutableStateOf(false) }
+        var username by remember { mutableStateOf("") }
 
         fun selectData(pin: String) {
                 val url = "http://192.168.254.107/CalleCafe/login.php"
@@ -75,6 +76,45 @@ fun LoginScreen(navController: NavController) {
         }
 
 
+        if (showUsernameDialog) {
+                AlertDialog(
+                        onDismissRequest = { showUsernameDialog = false },
+                        title = { Text(text = "Enter Username") },
+                        text = {
+                                Column {
+                                        TextField(
+                                                value = username,
+                                                onValueChange = { username = it },
+                                                label = { Text("Username") },
+                                                modifier = Modifier.fillMaxWidth()
+                                        )
+                                }
+                        },
+                        confirmButton = {
+                                Button(
+                                        onClick = {
+                                                if (username.isNotBlank()) {
+                                                        // Navigate to PinInputScreen with username as parameter
+                                                        navController.navigate("Routes.PinInputScreen/$username")
+                                                        showUsernameDialog = false
+                                                } else {
+                                                        Toast.makeText(context, "Please enter your username", Toast.LENGTH_SHORT).show()
+                                                }
+                                        }
+                                ) {
+                                        Text("Continue")
+                                }
+                        },
+                        dismissButton = {
+                                Button(
+                                        onClick = { showUsernameDialog = false }
+                                ) {
+                                        Text("Cancel")
+                                }
+                        }
+                )
+        }
+
 
         BackHandler {
                 // Exit the app when back is pressed on LoginScreen
@@ -104,8 +144,7 @@ fun LoginScreen(navController: NavController) {
                 // Sign-in button
                 Button(
                         onClick = {
-//                                showPinDialog = true
-                                navController.navigate("Routes.PinInputScreen")
+                                showUsernameDialog = true
                         },
                         modifier = Modifier
                                 .bounceClick()

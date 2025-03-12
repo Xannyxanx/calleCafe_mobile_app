@@ -61,7 +61,11 @@ import com.example.loginpage.AccountViewModel
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun PinInputScreen(navController: NavController, accountViewModel: AccountViewModel = viewModel()) {
+fun PinInputScreen(
+    navController: NavController,
+    username: String, // Add username parameter
+    accountViewModel: AccountViewModel = viewModel()
+) {
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
     var otpText by remember { mutableStateOf("") }
@@ -76,7 +80,7 @@ fun PinInputScreen(navController: NavController, accountViewModel: AccountViewMo
         }
     }
 
-    fun selectData(pin: String) {
+    fun selectData(username: String, pin: String) {
         val url = "http://192.168.254.107/CalleCafe/login.php"
         val requestQueue: RequestQueue = Volley.newRequestQueue(context)
         val stringRequest = object : StringRequest(
@@ -101,7 +105,10 @@ fun PinInputScreen(navController: NavController, accountViewModel: AccountViewMo
             }
         ) {
             override fun getParams(): MutableMap<String, String> {
-                return hashMapOf("pin" to pin)
+                return hashMapOf(
+                    "username" to username,
+                    "pin" to pin
+                )
             }
         }
         requestQueue.add(stringRequest)
@@ -182,10 +189,10 @@ fun PinInputScreen(navController: NavController, accountViewModel: AccountViewMo
 
                 Button(
                     onClick = {
-                        if (otpText.isNotEmpty()) {
-                            selectData(otpText)
+                        if (otpText.isNotEmpty() && username.isNotEmpty()) {
+                            selectData(username, otpText)
                         } else {
-                            Toast.makeText(context, "Please enter your PIN", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Please enter your credentials", Toast.LENGTH_SHORT).show()
                         }
                         focusManager.clearFocus()
                         if (otpText.length < 4) {
