@@ -308,7 +308,7 @@ private fun processText(visionText: Text, context: android.content.Context, navC
     val citizenType = when {
         pwdKeywords.any { keyword -> visionText.text.contains(keyword, ignoreCase = true) } -> "PWD"
         seniorCitizenKeywords.any { keyword -> visionText.text.contains(keyword, ignoreCase = true) } -> "Senior Citizen"
-        else -> "" 
+        else -> ""
     }
 
     val fullText = visionText.textBlocks.joinToString("\n") { it.text }
@@ -316,16 +316,18 @@ private fun processText(visionText: Text, context: android.content.Context, navC
     val idNumber = extractIdNumber(fullText)
     val city = extractCity(fullText)
 
+    val formattedItems = formatSelectedItems(selectedItems)
+
     val data = listOf(
         "CitizenType=$citizenType",
-        "Items=${selectedItems.joinToString(",")}"
+        "Items=$formattedItems"
     ).joinToString("&")
 
     Log.d("ProcessText", "Extracted Name: $name")
     Log.d("ProcessText", "Extracted ID Number: $idNumber")
     Log.d("ProcessText", "Extracted City: $city")
     Log.d("ProcessText", "Citizen Type: $citizenType")
-    Log.d("ProcessText", "Selected Items: $selectedItems")
+    Log.d("ProcessText", "Formatted Items: $formattedItems")
 
     val encodedData = URLEncoder.encode(data, "UTF-8")
     navController.navigate("Routes.ConfirmationScreen/$name/$idNumber/$city/$encodedData")
@@ -500,4 +502,12 @@ private fun extractFallbackIdNumber(text: String): String {
         }
     }
     return ""
+}
+
+private fun formatSelectedItems(items: List<String>): String {
+    val order = listOf("Drinks", "Pasta", "Pastry")
+    return items
+        .filter { it in order }
+        .sortedBy { order.indexOf(it) }
+        .joinToString(",")
 }

@@ -48,6 +48,9 @@ import com.android.volley.toolbox.StringRequest
 import com.android.volley.toolbox.Volley
 import org.json.JSONObject
 import java.net.URLDecoder
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -61,7 +64,7 @@ import java.net.URLEncoder
 fun ConfirmationScreen(navController: NavController, name: String, idNumber: String, city: String, items: String, accountViewModel: AccountViewModel = viewModel()) {
     val context = LocalContext.current
     val transactionSuccessful by remember { mutableStateOf(true) }
-    var showConfirmDialog by remember { mutableStateOf(false) } // State for the confirmation dialog
+    var showConfirmDialog by remember { mutableStateOf(false) }
     val nameDb = name
     val idNumberDb = idNumber
     val cityDb = city
@@ -71,7 +74,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
     val decodedIdNumber = URLDecoder.decode(idNumber, "UTF-8")
     val decodedCity = URLDecoder.decode(city, "UTF-8")
 
-    // Decode the items correctly
+    //PAG DECODE NG ITEMS FOR UTF=8
     val decodedData = URLDecoder.decode(items, "UTF-8").split("&")
     val dataMap = decodedData.associate {
         val parts = it.split("=")
@@ -84,6 +87,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
     val discountPrefs = remember { DiscountPreferences(context) }
     val discountPercentage = remember { mutableStateOf(0f) }
 
+    //PAG KUHA NG ITEMS IF PWD BA OR SENIOR CITIZENS
     LaunchedEffect(citizenType) {
         discountPercentage.value = when (citizenType) {
             "PWD" -> discountPrefs.getDiscountPercentage("pwd")
@@ -111,10 +115,23 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
         navController.navigate("Routes.ManualScreen?prefilled=$encodedData")
     }
 
-    //Wag galawin
-    fun insertData(idNumber: String, name: String, disability: String) {
-        val url = "http://192.168.254.107/customers.php"
+    data class TransactionData(
+        val idNumber: String,
+        val name: String,
+        val city: String,
+        val citizenType: String,
+        val items: String,
+        val date: String,
+        val time: String,
+        val cashierName: String,
+        val branch: String,
+        val discountPercentage: Float
+    )
+
+    fun insertData(data: TransactionData) {
+        val url = "http://192.168.254.107/CalleCafe/mobile/Insertcustomers.php"
         val requestQueue: RequestQueue = Volley.newRequestQueue(context)
+        
         val stringRequest = object : StringRequest(
             Request.Method.POST, url,
             Response.Listener { response ->
@@ -134,9 +151,16 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
         ) {
             override fun getParams(): MutableMap<String, String> {
                 val params = HashMap<String, String>()
-                params["idNumber"] = idNumber
-                params["name"] = name
-                params["city"] = city
+                params["idNumber"] = data.idNumber
+                params["name"] = data.name
+                params["city"] = data.city
+                params["citizenType"] = data.citizenType
+                params["food"] = data.items
+                params["date"] = data.date
+                params["time"] = data.time
+                params["cashierName"] = data.cashierName
+                params["branch"] = data.branch
+                params["discountPercentage"] = data.discountPercentage.toString()
                 return params
             }
         }
@@ -144,7 +168,6 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
         requestQueue.add(stringRequest)
     }
 
-    // Disable back key
     BackHandler {
         val previousRoute = navController.previousBackStackEntry?.destination?.route
         if (previousRoute == "Routes.LoginScreen" || previousRoute == "Routes.PinInputScreen") {
@@ -307,24 +330,33 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
             text = { Text("Complete transaction?") },
             confirmButton = {
                 Button(onClick = {
-                    navController.navigate("Routes.ScannerScreen")
+                    // Get the current account holder
+                    val account = accountHolder ?: return@Button
+                    
+                    // Get current date and time
+                    val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+                    val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
 
-                    //******** IMPORTANT, Code to input data from mobile app papunta sa database ********
+                    // Prepare all data to be inserted
+                    val dataToInsert = TransactionData(
+                        idNumber = idNumberDb,
+                        name = nameDb,
+                        city = cityDb,
+                        citizenType = citizenType,
+                        items = decodedItemsList,
+                        date = currentDate,
+                        time = currentTime,
+                        cashierName = account.name,
+                        branch = account.branch,
+                        discountPercentage = discountPercentage.value
+                    )
 
-                    Log.d("DEBUG", "IdNumber: $idNumberDb, Name: $nameDb, Disability: $cityDb")
+                    // Log all data for debugging
+                    Log.d("INSERT_DATA", "Data to be inserted: $dataToInsert")
 
-                    if (idNumberDb.isNotEmpty() && nameDb.isNotEmpty() && cityDb.isNotEmpty()) {
-                        Log.d("DEBUG", "Inserting data")
-                        insertData(idNumberDb, nameDb, cityDb)
-                    } else {
-                        Toast.makeText(context, "Please fill in all the fields", Toast.LENGTH_SHORT).show()
-                    }
-
-                    if (transactionSuccessful) {
-
-                    } else {
-                        Toast.makeText(context, "Transaction Canceled", Toast.LENGTH_SHORT).show()
-                    }
+                    // Insert the data
+                    insertData(dataToInsert)
+                    
                     showConfirmDialog = false
 
                 }) {

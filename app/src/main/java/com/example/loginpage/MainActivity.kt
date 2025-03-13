@@ -67,7 +67,8 @@ class MainActivity : ComponentActivity() {
                         name = backStackEntry.arguments?.getString("name") ?: "",
                         idNumber = backStackEntry.arguments?.getString("idNumber") ?: "",
                         city = backStackEntry.arguments?.getString("city") ?: "",
-                        items = backStackEntry.arguments?.getString("items") ?: ""
+                        items = backStackEntry.arguments?.getString("items") ?: "",
+                        accountViewModel = accountViewModel // Make sure this is passed
                     )
                 }
 
@@ -91,7 +92,7 @@ class MainActivity : ComponentActivity() {
                     val idNumber = backStackEntry.arguments?.getString("idNumber") ?: ""
                     val items = backStackEntry.arguments?.getString("items") ?: ""
                     val city = backStackEntry.arguments?.getString("city") ?: ""
-                    ConfirmationScreen(navController = navController, name = name, idNumber = idNumber, city = city, items = items)
+                    ConfirmationScreen(navController = navController, name = name, idNumber = idNumber, city = city, items = items, accountViewModel = accountViewModel)
                 }
                 composable(
                     "Routes.ManualScreen?selectedItems={selectedItems}&prefilled={prefilled}",

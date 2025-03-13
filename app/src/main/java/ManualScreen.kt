@@ -405,10 +405,13 @@ fun ManualScreen(
                                 Toast.LENGTH_SHORT
                             ).show()
                         } else {
+                            // Format the selected items
+                            val formattedItems = formatSelectedItems(selectedItems)
+                            
                             // Create the data string properly
                             val data = listOf(
                                 "CitizenType=${selectedCitizenType.value}",
-                                "Items=${selectedItems.joinToString(",")}"
+                                "Items=$formattedItems"
                             ).joinToString("&")
                             
                             // URL encode the data
@@ -434,4 +437,15 @@ fun ManualScreen(
             }
         }
     }
+}
+
+private fun formatSelectedItems(items: List<String>): String {
+    // Define the desired order
+    val order = listOf("Drinks", "Pasta", "Pastry")
+    
+    // Sort and filter items based on the defined order
+    return items
+        .filter { it in order } // Only keep items that are in our order list
+        .sortedBy { order.indexOf(it) } // Sort based on the defined order
+        .joinToString(",")
 }

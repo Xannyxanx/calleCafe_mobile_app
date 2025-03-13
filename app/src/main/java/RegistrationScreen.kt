@@ -98,7 +98,7 @@ fun RegistrationScreen(
                 val params = HashMap<String, String>()
                 params["branch"] = branchDb
                 params["name"] = nameDb
-                params["pin"] = pinDb // PIN is now preserved as a string
+                params["pin"] = pinDb
                 params["username"] = usernameDb
                 return params
             }
