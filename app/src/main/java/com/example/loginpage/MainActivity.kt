@@ -87,12 +87,31 @@ class MainActivity : ComponentActivity() {
                 }
 
 
-                composable("Routes.ConfirmationScreen/{name}/{idNumber}/{city}/{items}") { backStackEntry ->
+                composable(
+                    "Routes.ConfirmationScreen/{name}/{idNumber}/{city}/{items}",
+                    arguments = listOf(
+                        navArgument("name") { type = NavType.StringType },
+                        navArgument("idNumber") { type = NavType.StringType },
+                        navArgument("city") { type = NavType.StringType },
+                        navArgument("items") { 
+                            type = NavType.StringType 
+                            nullable = true // Make items nullable
+                        }
+                    )
+                ) { backStackEntry ->
+                    // Add customer ID extraction
+                    val itemsParam = backStackEntry.arguments?.getString("items") ?: ""
                     val name = backStackEntry.arguments?.getString("name") ?: ""
                     val idNumber = backStackEntry.arguments?.getString("idNumber") ?: ""
-                    val items = backStackEntry.arguments?.getString("items") ?: ""
                     val city = backStackEntry.arguments?.getString("city") ?: ""
-                    ConfirmationScreen(navController = navController, name = name, idNumber = idNumber, city = city, items = items, accountViewModel = accountViewModel)
+                    ConfirmationScreen(
+                        navController = navController, 
+                        name = name, 
+                        idNumber = idNumber, 
+                        city = city, 
+                        items = itemsParam, 
+                        accountViewModel = accountViewModel
+                    )
                 }
                 composable(
                     "Routes.ManualScreen?selectedItems={selectedItems}&prefilled={prefilled}",

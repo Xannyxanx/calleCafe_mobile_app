@@ -58,6 +58,14 @@ import com.example.loginpage.DiscountPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.net.URLEncoder
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.YuvImage
+import android.util.Base64
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
@@ -83,6 +91,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
     
     val citizenType = dataMap["CitizenType"] ?: ""
     val decodedItemsList = dataMap["Items"] ?: ""
+    val customerID = dataMap["CustomerID"] // Get the customer ID from dataMap
 
     val discountPrefs = remember { DiscountPreferences(context) }
     val discountPercentage = remember { mutableStateOf(0f) }
@@ -125,8 +134,13 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
         val time: String,
         val cashierName: String,
         val branch: String,
-        val discountPercentage: Float
+        val discountPercentage: Float,
+        val customerID: ByteArray? = null // Add nullable customer ID
     )
+
+    var showDuplicateDialog by remember { mutableStateOf(false) }
+    var duplicateFoodItems by remember { mutableStateOf<List<String>>(emptyList()) }
+    var existingOrderInfo by remember { mutableStateOf<Map<String, String>?>(null) }
 
     fun insertData(data: TransactionData) {
         val url = "http://192.168.254.107/CalleCafe/mobile/Insertcustomers.php"
@@ -142,7 +156,25 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                         popUpTo("Routes.ConfirmationScreen") { inclusive = true }
                     }
                 } else {
-                    Toast.makeText(context, "Insert Failed: ${jsonResponse.getString("message")}", Toast.LENGTH_SHORT).show()
+                    val errorMessage = jsonResponse.getString("message")
+                    if (errorMessage.contains("already been availed")) {
+                        val parts = errorMessage.split("\n\nComplete order information:")
+                        val duplicateItemsPart = parts[0].replace("The following food items have already been availed:\n• ", "")
+                        duplicateFoodItems = duplicateItemsPart.split("\n• ")
+
+                        existingOrderInfo = parts.getOrNull(1)
+                            ?.split("\n")
+                            ?.mapNotNull { line ->
+                                line.split(": ", limit = 2).takeIf { it.size == 2 }?.let {
+                                    it[0].trim() to it[1].trim()
+                                }
+                            }
+                            ?.toMap()
+                        
+                        showDuplicateDialog = true
+                    } else {
+                        Toast.makeText(context, "Insert Failed: $errorMessage", Toast.LENGTH_SHORT).show()
+                    }
                 }
             },
             Response.ErrorListener { error ->
@@ -161,6 +193,9 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                 params["cashierName"] = data.cashierName
                 params["branch"] = data.branch
                 params["discountPercentage"] = data.discountPercentage.toString()
+                data.customerID?.let {
+                    params["customerID"] = Base64.encodeToString(it, Base64.DEFAULT)
+                }
                 return params
             }
         }
@@ -271,6 +306,46 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                                             color = Color.Green
                                         )
                                     }
+
+                                    // Display the customer ID image
+                                    val decodedCustomerID = remember(customerID) {
+                                        if (customerID != null) {
+                                            try {
+                                                Base64.decode(customerID, Base64.DEFAULT)
+                                            } catch (e: Exception) {
+                                                Log.e("DECODE_ERROR", "Failed to decode customer ID", e)
+                                                null
+                                            }
+                                        } else {
+                                            null
+                                        }
+                                    }
+
+                                    decodedCustomerID?.let { safeDecodedId ->
+                                        val bitmap = remember(safeDecodedId) {
+                                            try {
+                                                BitmapFactory.decodeByteArray(safeDecodedId, 0, safeDecodedId.size)
+                                            } catch (e: Exception) {
+                                                Log.e("BITMAP_ERROR", "Failed to create bitmap from bytes", e)
+                                                null
+                                            }
+                                        }
+                                        
+                                        bitmap?.let { validBitmap ->
+                                            Image(
+                                                bitmap = validBitmap.asImageBitmap(),
+                                                contentDescription = "Customer ID",
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(120.dp)
+                                            )
+                                            Text(
+                                                "Image size: ${validBitmap.width}x${validBitmap.height}",
+                                                color = Color.Gray,
+                                                fontSize = 12.sp
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
@@ -339,16 +414,23 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
 
                     // Prepare all data to be inserted
                     val dataToInsert = TransactionData(
-                        idNumber = idNumberDb,
-                        name = nameDb,
-                        city = cityDb,
+                        idNumber = URLDecoder.decode(idNumberDb, "UTF-8"), // Decode original ID number
+                        name = decodedName, // Use properly decoded name
+                        city = decodedCity, // Use properly decoded city
                         citizenType = citizenType,
                         items = decodedItemsList,
                         date = currentDate,
                         time = currentTime,
                         cashierName = account.name,
                         branch = account.branch,
-                        discountPercentage = discountPercentage.value
+                        discountPercentage = discountPercentage.value,
+                        customerID = customerID?.let {
+                            try {
+                                Base64.decode(it, Base64.DEFAULT)
+                            } catch (e: Exception) {
+                                null
+                            }
+                        }
                     )
 
                     // Log all data for debugging
@@ -368,6 +450,65 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                     showConfirmDialog = false
                 }) {
                     Text("No")
+                }
+            }
+        )
+    }
+
+    // Duplicate items alert
+    if (showDuplicateDialog) {
+        AlertDialog(
+            onDismissRequest = { showDuplicateDialog = false },
+            title = {
+                Text("Duplicate Food Items", 
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Red)
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .sizeIn(maxHeight = 400.dp)
+                ) {
+                    Text("The following items have already been availed today:", 
+                        fontWeight = FontWeight.SemiBold)
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    duplicateFoodItems.forEach { item ->
+                        Text("• $item", 
+                            modifier = Modifier.padding(vertical = 2.dp))
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text("Existing Order Details:", 
+                        fontWeight = FontWeight.SemiBold)
+                    
+                    existingOrderInfo?.forEach { (key, value) ->
+                        Text("${key}: $value",
+                            modifier = Modifier.padding(vertical = 2.dp),
+                            fontSize = 14.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDuplicateDialog = false
+                        handleEditButtonClick()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDAA520))
+                ) {
+                    Text("Edit Order")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showDuplicateDialog = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("Cancel")
                 }
             }
         )

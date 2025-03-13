@@ -56,7 +56,13 @@ import java.util.Scanner
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageFormat
+import android.graphics.Rect
+import android.graphics.YuvImage
 import android.os.Bundle
+import android.util.Base64
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -93,6 +99,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.loginpage.AccountHolder
 import com.example.loginpage.AccountViewModel
+import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -302,7 +309,9 @@ private fun detected(visionText: Text): Boolean {
 private fun processText(visionText: Text, context: android.content.Context, navController: NavController, selectedItems: List<String>) {
     if (!detected(visionText)) {
         Log.d("ProcessText", "Not a PWD or Senior Citizen ID. Skipping extraction.")
+        Toast.makeText(context, "No PWD/Senior Citizen ID Detected, Proceeding to Manual Input", Toast.LENGTH_LONG).show()
         return
+
     }
 
     val citizenType = when {
@@ -313,15 +322,19 @@ private fun processText(visionText: Text, context: android.content.Context, navC
 
     val fullText = visionText.textBlocks.joinToString("\n") { it.text }
     val name = extractName(fullText)
-    val idNumber = extractIdNumber(fullText)
+    var idNumber = extractIdNumber(fullText)
     val city = extractCity(fullText)
 
     val formattedItems = formatSelectedItems(selectedItems)
+
+
 
     val data = listOf(
         "CitizenType=$citizenType",
         "Items=$formattedItems"
     ).joinToString("&")
+
+
 
     Log.d("ProcessText", "Extracted Name: $name")
     Log.d("ProcessText", "Extracted ID Number: $idNumber")
@@ -377,43 +390,135 @@ private fun processImageForTextRecognition(
     navController: NavController,
     selectedItems: List<String>
 ) {
-    if (selectedItems.isEmpty()) {
-        Log.d("ScannerScreen", "No selected items. Skipping text recognition.")
+    try {
+        val mediaImage = imageProxy.image ?: run {
+            Log.e("ImageCapture", "Media image is null")
+            imageProxy.close()
+            return
+        }
+
+        // 1. Capture image as bitmap first
+        val bitmap = try {
+            captureImageBitmap(mediaImage, imageProxy)
+        } catch (e: Exception) {
+            Log.e("ImageCapture", "Failed to capture image", e)
+            imageProxy.close()
+            return
+        }
+
+        // 2. Convert bitmap to Base64
+        val byteArrayOutputStream = ByteArrayOutputStream()
+
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, byteArrayOutputStream)
+        val imageBytes = byteArrayOutputStream.toByteArray()
+        if (imageBytes.size > 1) {
+            val header = String.format("%02X%02X", imageBytes[0], imageBytes[1])
+            Log.d("JPEG_CHECK", "Header: $header") // Should output "FFD8"
+        }
+        val base64Image = Base64.encodeToString(imageBytes, Base64.DEFAULT)
+
+        // Validate the image
+        if (base64Image.isEmpty()) {
+            Log.e("ImageCapture", "Empty Base64 image generated!")
+            Toast.makeText(context, "Failed to capture ID image", Toast.LENGTH_SHORT).show()
+            imageProxy.close()
+            return
+        }
+
+        // 3. Debug logging
+        Log.d("ImageDebug", "Image size: ${imageBytes.size} bytes")
+        Log.d("ImageDebug", "Base64 length: ${base64Image.length}")
+
+        // 4. Create InputImage from bitmap (safer than mediaImage)
+        val inputImage = InputImage.fromBitmap(bitmap, imageProxy.imageInfo.rotationDegrees)
+
+        // 5. Process text recognition
+        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+
+        recognizer.process(inputImage)
+            .addOnSuccessListener { visionText ->
+                try {
+                    val fullText = visionText.text
+                    val name = extractName(fullText)
+                    var idNumber = extractIdNumber(fullText)
+                    val city = extractCity(fullText)
+                    if (idNumber.isBlank()) {
+                        idNumber = extractFallbackIdNumber(fullText)
+                    }
+
+                    if (detected(visionText)) {
+                        // Create navigation data with extracted information
+                        val data = listOf(
+                            "CitizenType=${getCitizenType(visionText)}",
+                            "Items=${formatSelectedItems(selectedItems)}",
+                            "CustomerID=$base64Image" // Add image to data
+                        ).joinToString("&")
+
+                        // Navigate to ConfirmationScreen
+                        val encodedData = URLEncoder.encode(data, "UTF-8")
+                        navController.navigate("Routes.ConfirmationScreen/$name/$idNumber/$city/$encodedData")
+                        Log.d("Navigation", "Navigating with image and text data")
+                    } else {
+                        // Handle manual navigation with image
+                        CoroutineScope(Dispatchers.Main).launch {
+                            val encodedItems = URLEncoder.encode(selectedItems.joinToString(","), "UTF-8")
+                            navController.navigate("Routes.ManualScreen?selectedItems=$encodedItems&customerID=${URLEncoder.encode(base64Image, "UTF-8")}")
+                            Log.d("Navigation", "Navigating to ManualScreen with image")
+                        }
+                    }
+                } finally {
+                    isScanning.value = false
+                    imageProxy.close()
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("TextRecognition", "Failed to process image", e)
+                // Handle failure and navigate to manual input with image
+                CoroutineScope(Dispatchers.Main).launch {
+                    val encodedItems = URLEncoder.encode(selectedItems.joinToString(","), "UTF-8")
+                    navController.navigate("Routes.ManualScreen?selectedItems=$encodedItems&customerID=${URLEncoder.encode(base64Image, "UTF-8")}")
+                    Log.d("Navigation", "Failed processing, navigating to ManualScreen with image")
+                }
+                isScanning.value = false
+                imageProxy.close()
+            }
+    } catch (e: Exception) {
+        Log.e("TextRecognition", "Unexpected error", e)
+        // Always navigate to manual input on error
+        CoroutineScope(Dispatchers.Main).launch {
+            val encodedItems = URLEncoder.encode(selectedItems.joinToString(","), "UTF-8")
+            navController.navigate("Routes.ManualScreen?selectedItems=$encodedItems")
+        }
         isScanning.value = false
         imageProxy.close()
-        return
     }
+}
 
-    val mediaImage = imageProxy.image
-    if (mediaImage != null) {
-        val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        recognizer.process(inputImage).addOnSuccessListener { visionText ->
-            if (!detected(visionText)) {
-                Log.d("ScannerScreen", "No ID detected. Navigating to ManualScreen.")
-                Toast.makeText(context, "No valid ID detected. Proceeding to Manual Input", Toast.LENGTH_SHORT).show()
-                imageProxy.close()
-                isScanning.value = false
-
-                // Use CoroutineScope to navigate on the main thread
-                CoroutineScope(Dispatchers.Main).launch {
-                    // Join and encode items as URL-safe string
-                    val encodedItems = URLEncoder.encode(selectedItems.joinToString(","), "UTF-8")
-                    navController.navigate("Routes.ManualScreen?selectedItems=$encodedItems")
-                }
-                return@addOnSuccessListener
-            }
-            processText(visionText, context, navController, selectedItems)
-        }.addOnFailureListener { e ->
-            Log.e("TextRecognition", "Failed to process image", e)
-        }.addOnCompleteListener {
-            imageProxy.close()
-            isScanning.value = false // Reset scanning state after processing
-        }
-    } else {
-        imageProxy.close()
-        isScanning.value = false // Reset scanning state if no media image
+private fun getCitizenType(visionText: Text): String {
+    return when {
+        pwdKeywords.any { keyword -> visionText.text.contains(keyword, ignoreCase = true) } -> "PWD"
+        seniorCitizenKeywords.any { keyword -> visionText.text.contains(keyword, ignoreCase = true) } -> "Senior Citizen"
+        else -> "Unknown"
     }
+}
+private fun captureImageBitmap(
+    mediaImage: android.media.Image,
+    imageProxy: ImageProxy
+): Bitmap {
+    val yBuffer = mediaImage.planes[0].buffer
+    val uBuffer = mediaImage.planes[1].buffer
+    val vBuffer = mediaImage.planes[2].buffer
+    val ySize = yBuffer.remaining()
+    val uSize = uBuffer.remaining()
+    val vSize = vBuffer.remaining()
+    val nv21 = ByteArray(ySize + uSize + vSize)
+    yBuffer.get(nv21, 0, ySize)
+    vBuffer.get(nv21, ySize, vSize)
+    uBuffer.get(nv21, ySize + vSize, uSize)
+    val yuvImage = YuvImage(nv21, ImageFormat.NV21, mediaImage.width, mediaImage.height, null)
+    val outputStream = ByteArrayOutputStream()
+    yuvImage.compressToJpeg(Rect(0, 0, mediaImage.width, mediaImage.height), 70, outputStream)
+    return BitmapFactory.decodeByteArray(outputStream.toByteArray(), 0, outputStream.size())
 }
 
 private fun extractName(text: String): String {
