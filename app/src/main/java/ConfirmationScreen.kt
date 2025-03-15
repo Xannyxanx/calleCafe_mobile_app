@@ -40,7 +40,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import com.android.volley.Request
 import com.android.volley.RequestQueue
 import com.android.volley.Response
@@ -51,6 +53,19 @@ import java.net.URLDecoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,9 +78,12 @@ import android.graphics.BitmapFactory
 import android.graphics.YuvImage
 import android.util.Base64
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.navigation.NavController
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
@@ -96,6 +114,13 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
     val discountPrefs = remember { DiscountPreferences(context) }
     val discountPercentage = remember { mutableStateOf(0f) }
 
+    var priceInput by remember { mutableStateOf("") }
+    var controlNumber by remember { mutableStateOf("") }
+    val priceValue = remember(priceInput, discountPercentage.value) {
+        val price = priceInput.toFloatOrNull() ?: 0f
+        price * (1 - discountPercentage.value / 100)
+    }
+
     //PAG KUHA NG ITEMS IF PWD BA OR SENIOR CITIZENS
     LaunchedEffect(citizenType) {
         discountPercentage.value = when (citizenType) {
@@ -119,7 +144,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
 
         // Convert data to URL encoded string
         val encodedData = URLEncoder.encode(Gson().toJson(preFilledData), "UTF-8")
-        
+
         // Navigate to ManualScreen with the pre-filled data
         navController.navigate("Routes.ManualScreen?prefilled=$encodedData")
     }
@@ -135,6 +160,9 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
         val cashierName: String,
         val branch: String,
         val discountPercentage: Float,
+        val controlNo: String,
+        val originalPrice: Float,
+        val totalPrice: Float,
         val customerID: ByteArray? = null // Add nullable customer ID
     )
 
@@ -145,7 +173,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
     fun insertData(data: TransactionData) {
         val url = "http://192.168.254.107/CalleCafe/mobile/Insertcustomers.php"
         val requestQueue: RequestQueue = Volley.newRequestQueue(context)
-        
+
         val stringRequest = object : StringRequest(
             Request.Method.POST, url,
             Response.Listener { response ->
@@ -170,7 +198,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                                 }
                             }
                             ?.toMap()
-                        
+
                         showDuplicateDialog = true
                     } else {
                         Toast.makeText(context, "Insert Failed: $errorMessage", Toast.LENGTH_SHORT).show()
@@ -193,6 +221,9 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                 params["cashierName"] = data.cashierName
                 params["branch"] = data.branch
                 params["discountPercentage"] = data.discountPercentage.toString()
+                params["control_no"] = data.controlNo
+                params["original_price"] = data.originalPrice.toString()
+                params["total_price"] = data.totalPrice.toString()
                 data.customerID?.let {
                     params["customerID"] = Base64.encodeToString(it, Base64.DEFAULT)
                 }
@@ -224,7 +255,8 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
         Scaffold(
             topBar = {
                 AppTopBar(navController = navController)
-            }
+            },
+            containerColor = Color.Transparent
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -234,58 +266,61 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                     .padding(horizontal = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Logo
+                // Logo Section (Compact)
                 Image(
                     painter = painterResource(id = R.drawable.loginpageimage),
                     contentDescription = "Logo",
                     modifier = Modifier
-                        .height(80.dp)
-                        .width(80.dp)
-                        .padding(bottom = 16.dp)
+                        .size(60.dp)
+                        .padding(vertical = 8.dp)
                         .alpha(0.5f)
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Main Content Card
-                Column(
+                // Main Content Card (Optimized Height)
+                Card(
                     modifier = Modifier
-                        .verticalScroll(rememberScrollState()) // Add scroll if content is too long
-                        .weight(1f, fill = true)
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(bottom = 8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE0C1A6))
                 ) {
-                    Card(
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(8.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE0C1A6))
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.Top
                     ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            // Header
-                            Text(
-                                text = "ORDER CONFIRMATION",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = Color.White,
+                        // Order Info Section (Tighter Padding)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
                                 modifier = Modifier
-                                    .padding(8.dp)
-                                    .background(Color(0xFF8B4513), shape = RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                            )
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "ORDER CONFIRMATION",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = Color.White,
+                                    modifier = Modifier
+                                        .background(
+                                            Color(0xFF8B4513),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(8.dp)
+                                )
+                            }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
                             // White Box
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(180.dp)
-                                    .background(Color.White, shape = RoundedCornerShape(8.dp))
+                                    .height(160.dp)  // Reduced height
+                                    .background(Color.White, RoundedCornerShape(8.dp))
                                     .padding(8.dp)
                             ) {
                                 Column(
@@ -330,7 +365,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                                                 null
                                             }
                                         }
-                                        
+
                                         bitmap?.let { validBitmap ->
                                             Image(
                                                 bitmap = validBitmap.asImageBitmap(),
@@ -350,16 +385,131 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                             }
 
                             Spacer(modifier = Modifier.height(24.dp))
+
+                            // Control Number Input
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Control No.:",
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        color = Color(0xFF8B4513),
+                                        fontSize = 16.sp
+                                    ),
+                                    modifier = Modifier.width(100.dp)
+                                )
+                                OutlinedTextField(
+                                    value = controlNumber,
+                                    onValueChange = { controlNumber = it },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp)
+                                        .border(1.dp, Color(0xFF8B4513), RoundedCornerShape(8.dp)),
+                                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                        fontSize = 14.sp,
+                                        color = Color(0xFF5C4033)
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = TextFieldDefaults.colors(
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White,
+                                        disabledContainerColor = Color.White,
+                                        focusedIndicatorColor = Color.Transparent,
+                                        unfocusedIndicatorColor = Color.Transparent
+                                    ),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Number,
+                                        imeAction = ImeAction.Next
+                                    ),
+                                    singleLine = true
+                                )
+                            }
+
+                            // Price Input and Calculation Display
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "₱",
+                                        style = MaterialTheme.typography.headlineSmall.copy(
+                                            color = Color(0xFF8B4513),
+                                            fontSize = 24.sp
+                                        )
+                                    )
+                                    OutlinedTextField(
+                                        value = priceInput,
+                                        onValueChange = { if (it.matches(Regex("^\\d*\\.?\\d*\$"))) priceInput = it },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(56.dp),
+                                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                            fontSize = 18.sp,
+                                            color = Color(0xFF5C4033),
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        placeholder = {
+                                            Text(
+                                                "0.00",
+                                                color = Color.LightGray,
+                                                fontSize = 16.sp
+                                            )
+                                        },
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = TextFieldDefaults.colors(
+                                            focusedContainerColor = Color(0xFFE0C1A6).copy(alpha = 0.3f),
+                                            unfocusedContainerColor = Color(0xFFE0C1A6).copy(alpha = 0.3f),
+                                            disabledContainerColor = Color(0xFFE0C1A6).copy(alpha = 0.3f),
+                                            focusedIndicatorColor = Color.Transparent,
+                                            unfocusedIndicatorColor = Color.Transparent
+                                        ),
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Number,
+                                            imeAction = ImeAction.Done
+                                        ),
+                                        singleLine = true
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Text(
+                                        text = "Discounted Total: ₱${"%,.2f".format(priceValue)}",
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            color = Color(0xFF006400),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        modifier = Modifier
+                                            .background(
+                                                color = Color(0xFFE0C1A6).copy(alpha = 0.5f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            )
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
                         }
                     }
-                    
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // Buttons at the bottom
+                // Buttons Row (Fixed Height)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .height(60.dp)  // Fixed button row height
                         .padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
@@ -384,6 +534,11 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                             .padding(start = 4.dp)
                             .height(48.dp),
                         onClick = {
+                            if (priceInput.isEmpty() || controlNumber.isEmpty()) {
+                                Toast.makeText(context, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+
                             showConfirmDialog = true
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF008000))
@@ -391,8 +546,6 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                         Text(text = "CONFIRM", color = Color.White)
                     }
                 }
-
-                Spacer(modifier = Modifier.height(16.dp)) // Add extra space at the bottom
             }
         }
     }
@@ -407,7 +560,7 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                 Button(onClick = {
                     // Get the current account holder
                     val account = accountHolder ?: return@Button
-                    
+
                     // Get current date and time
                     val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
                     val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
@@ -424,6 +577,9 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
                         cashierName = account.name,
                         branch = account.branch,
                         discountPercentage = discountPercentage.value,
+                        controlNo = controlNumber,
+                        originalPrice = priceInput.toFloatOrNull() ?: 0f,
+                        totalPrice = priceValue,
                         customerID = customerID?.let {
                             try {
                                 Base64.decode(it, Base64.DEFAULT)

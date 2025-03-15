@@ -66,4 +66,12 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     val nav_version = "2.8.5"
     implementation("androidx.navigation:navigation-compose:$nav_version")
+    implementation ("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation ("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation ("com.squareup.okhttp3:okhttp:4.10.0")
+    implementation ("com.squareup.okhttp3:logging-interceptor:4.10.0")
+
+    // Coroutines
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
+
 }
