@@ -1,5 +1,6 @@
 package com.example.loginpage
 
+import DiscountManager
 import android.annotation.SuppressLint
 import android.util.Log
 import android.widget.Toast
@@ -69,7 +70,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.loginpage.DiscountPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import java.net.URLEncoder
@@ -87,7 +87,7 @@ import androidx.navigation.NavController
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun ConfirmationScreen(navController: NavController, name: String, idNumber: String, city: String, items: String, accountViewModel: AccountViewModel = viewModel()) {
+fun ConfirmationScreen(navController: NavController, name: String, idNumber: String, city: String, items: String, accountViewModel: AccountViewModel = viewModel(), discountManager: DiscountManager) {
     val context = LocalContext.current
     val transactionSuccessful by remember { mutableStateOf(true) }
     var showConfirmDialog by remember { mutableStateOf(false) }
@@ -106,13 +106,14 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
         val parts = it.split("=")
         parts[0] to parts[1]
     }
-    
+
     val citizenType = dataMap["CitizenType"] ?: ""
     val decodedItemsList = dataMap["Items"] ?: ""
     val customerID = dataMap["CustomerID"] // Get the customer ID from dataMap
 
-    val discountPrefs = remember { DiscountPreferences(context) }
-    val discountPercentage = remember { mutableStateOf(0f) }
+    val discountPercentage = remember(citizenType) { 
+        mutableStateOf(discountManager.getDiscountPercentage(citizenType))
+    }
 
     var priceInput by remember { mutableStateOf("") }
     var controlNumber by remember { mutableStateOf("") }
@@ -121,15 +122,8 @@ fun ConfirmationScreen(navController: NavController, name: String, idNumber: Str
         price * (1 - discountPercentage.value / 100)
     }
 
-    //PAG KUHA NG ITEMS IF PWD BA OR SENIOR CITIZENS
-    LaunchedEffect(citizenType) {
-        discountPercentage.value = when (citizenType) {
-            "PWD" -> discountPrefs.getDiscountPercentage("pwd")
-            "Senior Citizen" -> discountPrefs.getDiscountPercentage("senior")
-            "Others" -> discountPrefs.getDiscountPercentage("others")
-            else -> 0f
-        }
-    }
+    // Remove all LaunchedEffect/PWD/Senior Citizen discount logic
+    // Remove any references to DiscountPreferences
 
     // Function to handle edit button click
     fun handleEditButtonClick() {

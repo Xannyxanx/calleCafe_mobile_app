@@ -62,14 +62,10 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
 
     val pin = remember { mutableStateOf("") }
     val context = LocalContext.current
-    val discountPrefs = remember { DiscountPreferences(context) }
     val usernameInputAccount = remember { mutableStateOf("") }
-    val seniorDiscount = remember { mutableStateOf(discountPrefs.getDiscountPercentage("senior").toString()) }
-    val pwdDiscount = remember { mutableStateOf(discountPrefs.getDiscountPercentage("pwd").toString()) }
-    val othersDiscount = remember { mutableStateOf(discountPrefs.getDiscountPercentage("others").toString()) }
 
     fun updateData(pin: String, username:String, cashierName: String, branch: String) {
-        val url = "http://192.168.254.107/accounts.php"
+        val url = "http://192.168.254.107/CalleCafe/mobile/accounts.php"
         val requestQueue: RequestQueue = Volley.newRequestQueue(context)
 
         val stringRequest = object : StringRequest(
@@ -236,73 +232,11 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(8.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE0C1A6))
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "UPDATE DISCOUNTS PERCENTAGES",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
-                            modifier = Modifier
-                                .background(Color(0xFF8B4513), shape = RoundedCornerShape(8.dp))
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            @OptIn(ExperimentalMaterial3Api::class)
-                            @Composable
-                            fun DiscountField(
-                                label: String,
-                                valueState: MutableState<String>
-                            ) {
-                                OutlinedTextField(
-                                    value = valueState.value,
-                                    onValueChange = { newValue ->
-                                        // Allow empty string or valid decimal numbers up to 2 decimal places
-                                        if (newValue.isEmpty() || newValue.matches(Regex("^\\d*(\\.\\d{0,2})?$")) && newValue.length <= 5) {
-                                            valueState.value = newValue
-                                        }
-                                    },
-                                    label = { Text(text = label) },
-                                    keyboardOptions = KeyboardOptions.Default.copy(
-                                        keyboardType = KeyboardType.Number
-                                    ),
-                                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                                        focusedBorderColor = Color.Black,
-                                        unfocusedBorderColor = Color.Black,
-                                        focusedLabelColor = Color.Black,
-                                        unfocusedLabelColor = Color.Black
-                                    ),
-                                    modifier = Modifier.width(100.dp)
-                                )
-                            }
-
-                            DiscountField("Senior Citizen", seniorDiscount)
-                            DiscountField("PWD", pwdDiscount)
-                            DiscountField("Others", othersDiscount)
-                        }
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
                     onClick = {
-                        if (pin.value.isNotEmpty()) {
+                        if (pin.value.isNotEmpty() || usernameInputAccount.value.isNotEmpty()) {
                             Log.d("DEBUG", "updating account's PIN")
                             accountHolder?.let {
                                 updateData(pin.value, usernameInputAccount.value, it.name, it.branch)
@@ -314,19 +248,6 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
-
-                        // Save discount percentages
-                        seniorDiscount.value.toFloatOrNull()?.let {
-                            discountPrefs.saveDiscountPercentage("senior", it)
-                        }
-                        pwdDiscount.value.toFloatOrNull()?.let {
-                            discountPrefs.saveDiscountPercentage("pwd", it)
-                        }
-                        othersDiscount.value.toFloatOrNull()?.let {
-                            discountPrefs.saveDiscountPercentage("others", it)
-                        }
-
-                        Toast.makeText(context, "Discount percentages updated!", Toast.LENGTH_SHORT).show()
                     },
                     modifier = Modifier
                         .bounceClick()
@@ -337,20 +258,5 @@ fun AccountsScreen(navController: NavController, accountViewModel: AccountViewMo
                 }
             }
         }
-    }
-}
-
-class DiscountPreferences(context: Context) {
-    private val sharedPref = context.getSharedPreferences("discount_prefs", Context.MODE_PRIVATE)
-
-    fun saveDiscountPercentage(type: String, percentage: Float) {
-        with(sharedPref.edit()) {
-            putFloat(type, percentage)
-            apply()
-        }
-    }
-
-    fun getDiscountPercentage(type: String): Float {
-        return sharedPref.getFloat(type, 0f) // 0f is default value if not found
     }
 }

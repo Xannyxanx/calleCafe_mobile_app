@@ -39,6 +39,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -54,6 +55,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.android.volley.DefaultRetryPolicy
 import com.android.volley.Request
 import com.android.volley.RequestQueue
 import com.android.volley.Response
@@ -68,13 +70,14 @@ fun RegistrationScreen(
     navController: NavController
 ) {
     val focusManager = LocalFocusManager.current
-    val storeBranch = arrayOf("Dapitan", "España")
-    val selectedStore = remember { mutableStateOf(storeBranch[0]) }
+    val selectedStore = remember { mutableStateOf("") }
     val expanded = remember { mutableStateOf(false) }
     val nameInputRegistration = remember { mutableStateOf("") }
     val pinInputRegistration = remember { mutableStateOf("") }
     val usernameInputRegistration = remember { mutableStateOf("") }
     val context = LocalContext.current
+    val branches = remember { mutableStateOf<List<String>>(emptyList()) }
+    val isLoading = remember { mutableStateOf(false) }
 
     fun insertData(branchDb: String, nameDb: String, pinDb: String, usernameDb: String) {
         val url = "http://192.168.254.107/CalleCafe/mobile/registeredAccounts.php"
@@ -107,6 +110,65 @@ fun RegistrationScreen(
         requestQueue.add(stringRequest)
     }
 
+    fun fetchBranches() {
+        isLoading.value = true
+        val url = "http://192.168.254.107/CalleCafe/mobile/get_branch_user.php"
+        
+        val requestQueue = Volley.newRequestQueue(context).apply {
+            cache?.clear() // Clear the request cache
+        }
+        
+        val stringRequest = object : StringRequest(
+            Request.Method.GET, url,
+            Response.Listener { response ->
+                try {
+                    val jsonResponse = JSONObject(response)
+                    if (jsonResponse.getBoolean("success")) {
+                        val branchesArray = jsonResponse.getJSONArray("branches")
+                        val branchList = mutableListOf<String>()
+                        for (i in 0 until branchesArray.length()) {
+                            branchList.add(branchesArray.getString(i))
+                        }
+                        branches.value = branchList
+                        if (branchList.isNotEmpty()) {
+                            selectedStore.value = branchList[0] 
+                        }
+                    } else {
+                        Toast.makeText(context, "Failed to load branches", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error parsing branch data", Toast.LENGTH_SHORT).show()
+                    Log.e("API_ERROR", "Parsing error", e)
+                }
+                isLoading.value = false
+            },
+            Response.ErrorListener { error ->
+                Toast.makeText(context, "Failed to load branches", Toast.LENGTH_SHORT).show()
+                Log.e("API_ERROR", "Request error: ${error.message}")
+                isLoading.value = false
+            }
+        ) {
+            override fun getHeaders(): MutableMap<String, String> {
+                return hashMapOf(
+                    "Content-Type" to "application/json",
+                    "Accept" to "application/json"
+                )
+            }
+        }
+
+        // Set timeout and retry policy
+        stringRequest.retryPolicy = DefaultRetryPolicy(
+            10000, // 10 seconds timeout
+            DefaultRetryPolicy.DEFAULT_MAX_RETRIES,
+            DefaultRetryPolicy.DEFAULT_BACKOFF_MULT
+        )
+
+        requestQueue.add(stringRequest)
+    }
+
+    LaunchedEffect(Unit) {
+        fetchBranches()
+    }
 
     Box(
         modifier = Modifier
@@ -174,7 +236,13 @@ fun RegistrationScreen(
                                 trailingIcon = {
                                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded.value)
                                 },
-                                label = { Text("Select Store Branch", color = Color.Black) },
+                                label = { 
+                                    Text(
+                                        text = if (isLoading.value) "Loading branches..." 
+                                              else "Select Store Branch", 
+                                        color = Color.Black
+                                    )
+                                },
                                 modifier = Modifier
                                     .menuAnchor()
                                     .fillMaxWidth(),
@@ -189,11 +257,11 @@ fun RegistrationScreen(
                                 expanded = expanded.value,
                                 onDismissRequest = { expanded.value = false }
                             ) {
-                                storeBranch.forEach { store ->
+                                branches.value.forEach { branch ->
                                     DropdownMenuItem(
-                                        text = { Text(store) },
+                                        text = { Text(branch) },
                                         onClick = {
-                                            selectedStore.value = store
+                                            selectedStore.value = branch
                                             expanded.value = false
                                         }
                                     )

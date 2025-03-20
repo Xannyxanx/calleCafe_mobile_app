@@ -1,5 +1,6 @@
 package com.example.loginpage
 
+import DiscountManager
 import PinAccountInputScreen
 import PinInputScreen
 import android.os.Bundle
@@ -21,11 +22,23 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.net.URLDecoder
 
 class MainActivity : ComponentActivity() {
+    private lateinit var discountManager: DiscountManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        discountManager = DiscountManager(this)
+        
+        // Fetch discounts on app start
+        CoroutineScope(Dispatchers.IO).launch {
+            discountManager.fetchDiscounts()
+        }
+
         setContent {
             val navController = rememberNavController()
             val accountViewModel: AccountViewModel = viewModel()
@@ -68,6 +81,7 @@ class MainActivity : ComponentActivity() {
                         idNumber = backStackEntry.arguments?.getString("idNumber") ?: "",
                         city = backStackEntry.arguments?.getString("city") ?: "",
                         items = backStackEntry.arguments?.getString("items") ?: "",
+                        discountManager = discountManager,
                         accountViewModel = accountViewModel // Make sure this is passed
                     )
                 }
@@ -96,7 +110,9 @@ class MainActivity : ComponentActivity() {
                         navArgument("items") { 
                             type = NavType.StringType 
                             nullable = true // Make items nullable
+                            discountManager = discountManager
                         }
+
                     )
                 ) { backStackEntry ->
                     // Add customer ID extraction
@@ -110,6 +126,7 @@ class MainActivity : ComponentActivity() {
                         idNumber = idNumber, 
                         city = city, 
                         items = itemsParam, 
+                        discountManager = discountManager,
                         accountViewModel = accountViewModel
                     )
                 }
