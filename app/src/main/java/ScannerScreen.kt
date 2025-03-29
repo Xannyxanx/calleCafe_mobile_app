@@ -74,6 +74,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -96,6 +97,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.loginpage.AccountHolder
 import com.example.loginpage.AccountViewModel
@@ -122,6 +124,7 @@ fun ScannerScreen(navController: NavController, accountViewModel: AccountViewMod
             }
         }
     )
+    val activity = LocalContext.current as MainActivity
 
     LaunchedEffect(Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -161,7 +164,12 @@ fun ScannerScreen(navController: NavController, accountViewModel: AccountViewMod
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(Color(0xFF5C4033))
-                .padding(16.dp),
+                .padding(16.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        activity.resetTimer() // Use MainActivity's timer reset
+                    }
+                },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -266,6 +274,7 @@ fun ScannerScreen(navController: NavController, accountViewModel: AccountViewMod
                                     } else {
                                         selectedItems.remove(description)
                                     }
+                                    activity.resetTimer()
                                 }
                                 .border(
                                     width = if (isSelected.value) 2.dp else 0.dp,
