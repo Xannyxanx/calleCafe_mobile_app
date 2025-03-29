@@ -55,6 +55,7 @@ import androidx.navigation.NavController
 import java.util.Scanner
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -63,10 +64,13 @@ import android.graphics.Rect
 import android.graphics.YuvImage
 import android.os.Bundle
 import android.util.Base64
+import android.view.Surface
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -97,10 +101,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.loginpage.AccountHolder
 import com.example.loginpage.AccountViewModel
+import org.junit.runner.manipulation.Ordering
 import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,7 +130,19 @@ fun ScannerScreen(navController: NavController, accountViewModel: AccountViewMod
             }
         }
     )
-    val activity = LocalContext.current as MainActivity
+    val mainActivity = LocalContext.current as MainActivity
+
+    LaunchedEffect(Unit) {
+        mainActivity.requestedOrientation =
+            android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            mainActivity.requestedOrientation =
+                android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -159,7 +177,7 @@ fun ScannerScreen(navController: NavController, accountViewModel: AccountViewMod
             )
         }
     ) { paddingValues ->
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -167,129 +185,119 @@ fun ScannerScreen(navController: NavController, accountViewModel: AccountViewMod
                 .padding(16.dp)
                 .pointerInput(Unit) {
                     detectTapGestures {
-                        activity.resetTimer() // Use MainActivity's timer reset
+                        mainActivity.resetTimer() // Use MainActivity's timer reset
                     }
                 },
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Cashier: ${accountHolder?.name ?: "No User"}",
-                color = Color.White.copy(alpha = 0.5f),
+            // Left side - Camera preview
+            Box(
                 modifier = Modifier
-                    .align(Alignment.Start)
-                    .padding(bottom = 8.dp)
-            )
-            Text(
-                text = "Cashier: ${accountHolder?.branch ?: "No User"}",
-                color = Color.White.copy(alpha = 0.5f),
-                modifier = Modifier
-                    .align(Alignment.Start)
-            )
-
-            Spacer(modifier = Modifier.height(80.dp))
-
-            // Live Camera Feed
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                elevation = CardDefaults.cardElevation(8.dp)
+                    .weight(0.7f)
+                    .fillMaxHeight()
+                    .padding(end = 16.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
+                CameraPreviewContent(previewView = previewView)
+            }
+
+            // Right side - Controls and info
+            Column(
+                modifier = Modifier
+                    .weight(0.3f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.SpaceEvenly,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Cashier: ${accountHolder?.name ?: "No User"}",
+                    color = Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    text = "Branch: ${accountHolder?.branch ?: "No User"}",
+                    color = Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                Button(
+                    onClick = {
+                        if (selectedItems.isNotEmpty()) {
+                            isScanning.value = true
+                        } else {
+                            Log.d("ScannerScreen", "No selected items. Cannot start scanning.")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF008000),
+                        contentColor = Color(0xFFFFFFFF)
+                    ),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .background(Color.LightGray),
-                    contentAlignment = Alignment.Center
+                        .padding(vertical = 8.dp)
+                        .bounceClick()
                 ) {
-                    AndroidView(
-                        factory = { previewView },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    Text(text = "SCAN ID", fontWeight = FontWeight.Bold)
                 }
-            }
 
-            Spacer(modifier = Modifier.height(80.dp))
+                // Food Selection
+                val itemsList = listOf(
+                    Pair("Drinks", R.drawable.drinks),
+                    Pair("Pasta", R.drawable.pasta),
+                    Pair("Pastry", R.drawable.snacks)
+                )
+                val selectedStates = remember { itemsList.map { mutableStateOf(false) } }
 
-            // Scan Button
-            Button(
-                onClick = {
-                    if (selectedItems.isNotEmpty()) {
-                        isScanning.value = true
-                    } else {
-                        Log.d("ScannerScreen", "No selected items. Cannot start scanning.")
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF008000),
-                    contentColor = Color(0xFFFFFFFF)
-                ),
-                modifier = Modifier
-                    .height(64.dp)
-                    .align(Alignment.CenterHorizontally)
-                    .padding(vertical = 8.dp)
-                    .bounceClick()
-            ) {
-                Text(text = "SCAN ID", fontWeight = FontWeight.Bold)
-            }
-
-            Spacer(modifier = Modifier.height(50.dp))
-
-            // Food Selection
-            val itemsList = listOf(
-                Pair("Drinks", R.drawable.drinks),
-                Pair("Pasta", R.drawable.pasta),
-                Pair("Pastry", R.drawable.snacks)
-            )
-            val selectedStates = remember { itemsList.map { mutableStateOf(false) } }
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(4.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFE0C1A6))
-            ) {
-                LazyRow(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(4.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE0C1A6))
                 ) {
-                    items(itemsList.size) { index ->
-                        val (description, drawableId) = itemsList[index]
-                        val isSelected = selectedStates[index]
-                        val alphaValue by animateFloatAsState(if (isSelected.value) 0.5f else 1f)
+                    LazyRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        items(itemsList) { (description, drawableId) ->
+                            val index = itemsList.indexOfFirst { it.first == description }
+                            val isSelected = selectedStates[index]
+                            val alphaValue by animateFloatAsState(if (isSelected.value) 0.5f else 1f)
 
-                        Box(
-                            modifier = Modifier
-                                .width(100.dp)
-                                .height(100.dp)
-                                .padding(horizontal = 8.dp)
-                                .clickable {
-                                    isSelected.value = !isSelected.value
-                                    if (isSelected.value) {
-                                        selectedItems.add(description)
-                                    } else {
-                                        selectedItems.remove(description)
-                                    }
-                                    activity.resetTimer()
-                                }
-                                .border(
-                                    width = if (isSelected.value) 2.dp else 0.dp,
-                                    color = if (isSelected.value) Color(0xFF008000) else Color.Transparent,
-                                    shape = RoundedCornerShape(4.dp)
-                                )
-                        ) {
-                            Icon(
-                                painter = painterResource(id = drawableId),
-                                contentDescription = description,
-                                tint = Color.Unspecified,
+                            Box(
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .alpha(alphaValue)
-                            )
+                                    .width(90.dp)
+                                    .height(90.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        isSelected.value = !isSelected.value
+                                        if (isSelected.value) {
+                                            selectedItems.add(description)
+                                        } else {
+                                            selectedItems.remove(description)
+                                        }
+                                        mainActivity.resetTimer()
+                                    }
+                                    .border(
+                                        width = if (isSelected.value) 2.dp else 0.dp,
+                                        color = if (isSelected.value) Color(0xFF008000) else Color.Transparent,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = drawableId),
+                                    contentDescription = description,
+                                    tint = Color.Unspecified,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(8.dp)
+                                        .alpha(alphaValue)
+                                )
+                            }
                         }
                     }
                 }
@@ -366,29 +374,81 @@ private fun startCamera(
     selectedItems: List<String>
 ) {
     cameraProviderFuture.addListener({
-        val cameraProvider = cameraProviderFuture.get()
-        val preview = Preview.Builder().build().also {
-            it.setSurfaceProvider(previewView.surfaceProvider)
-        }
-
-        val imageAnalysis = ImageAnalysis.Builder()
-            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST).build()
-        imageAnalysis.setAnalyzer(cameraExecutor, { imageProxy ->
-            if (isScanning.value) {
-                processImageForTextRecognition(imageProxy, context, isScanning, navController, selectedItems)
-            } else {
-                imageProxy.close()
-            }
-        })
-
-        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
         try {
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, imageAnalysis)
+            val cameraProvider = cameraProviderFuture.get()
+            Log.d("CameraSetup", "Got camera provider")
+
+            // Set up the preview use case
+            val preview = Preview.Builder()
+                .setTargetRotation(previewView.display.rotation)
+                .build()
+
+            preview.setSurfaceProvider(previewView.surfaceProvider)
+            Log.d("CameraSetup", "Preview surface provider set")
+
+            // Set up image analysis
+            val imageAnalysis = ImageAnalysis.Builder()
+                .setTargetRotation(previewView.display.rotation)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+
+            imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                if (isScanning.value) {
+                    processImageForTextRecognition(
+                        imageProxy,
+                        context,
+                        isScanning,
+                        navController,
+                        selectedItems
+                    )
+                } else {
+                    imageProxy.close()
+                }
+            }
+
+            // Select back camera
+            val cameraSelector = CameraSelector.Builder()
+                .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                .build()
+
+            try {
+                Log.d("CameraSetup", "Attempting to unbind use cases")
+                cameraProvider.unbindAll()
+                Log.d("CameraSetup", "Attempting to bind use cases")
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    preview,
+                    imageAnalysis
+                )
+                Log.d("CameraSetup", "Camera use cases bound successfully")
+            } catch (exc: Exception) {
+                Log.e("CameraSetup", "Use case binding failed", exc)
+            }
+
         } catch (exc: Exception) {
-            Log.e("CameraX", "Use case binding failed", exc)
+            Log.e("CameraSetup", "Camera initialization failed", exc)
         }
     }, ContextCompat.getMainExecutor(context))
+}
+
+@Composable
+private fun CameraPreviewContent(previewView: PreviewView) {
+    AndroidView(
+        factory = { context ->
+            previewView.apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+                scaleType = PreviewView.ScaleType.FILL_START
+                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            }
+        },
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    )
 }
 
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
